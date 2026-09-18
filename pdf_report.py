@@ -71,7 +71,7 @@ def individual_pdf(name, training_name, dept, job_level, scores, insights_list, 
     pdf.cell(35, 7, "Kategori", border=1, fill=True, align="C")
     pdf.cell(35, 7, "Target", border=1, fill=True, align="C", ln=1)
     pdf.set_font("helvetica", "", 9)
-    for dim in DIM_ORDER:
+    for dim in [x for x in DIM_ORDER if x in scores]:
         d = DIMS[dim]
         pdf.cell(95, 6.5, _safe(d["label"]), border=1)
         pdf.cell(25, 6.5, f"{scores[dim]:.0f}", border=1, align="C")
