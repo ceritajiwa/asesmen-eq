@@ -14,7 +14,8 @@ class BasePDF(FPDF):
         self.cell(0, 8, "Cerita Jiwa Training Center", align="L")
         self.set_font("helvetica", "", 9)
         self.set_text_color(120, 120, 120)
-        self.cell(0, 8, "Laporan Asesmen EQ & Emotional Regulation", align="R", ln=1)
+        label = getattr(self, "company", None) or "Laporan Asesmen EQ & Emotional Regulation"
+        self.cell(0, 8, _safe(label), align="R", ln=1)
         self.set_draw_color(91, 78, 158)
         self.line(10, self.get_y(), 200, self.get_y())
         self.ln(4)
@@ -55,6 +56,7 @@ def _need_space(pdf, threshold=250):
 # ============================== PDF INDIVIDUAL ==============================
 def individual_pdf(name, training_name, dept, job_level, scores, grouped, radar_png):
     pdf = BasePDF()
+    pdf.company = training_name
     pdf.add_page()
     pdf.set_text_color(30, 30, 30)
 
@@ -115,11 +117,17 @@ def company_pdf(bundle):
     """bundle: dict berisi semua komponen report perusahaan."""
     b = bundle
     pdf = BasePDF("L")
+    pdf.company = b["training_name"]
     pdf.add_page("L")
     pdf.set_text_color(30, 30, 30)
 
-    pdf.set_font("helvetica", "B", 16)
-    pdf.cell(0, 10, _safe(f"Laporan Agregat Asesmen EQ - {b['training_name']}"), align="C", ln=1)
+    pdf.set_font("helvetica", "", 11)
+    pdf.set_text_color(120, 120, 120)
+    pdf.cell(0, 6, "Laporan Agregat Asesmen EQ & Kondisi Psikologis Karyawan", align="C", ln=1)
+    pdf.set_font("helvetica", "B", 20)
+    pdf.set_text_color(91, 78, 158)
+    pdf.cell(0, 12, _safe(b["training_name"]), align="C", ln=1)
+    pdf.set_text_color(30, 30, 30)
     pdf.set_font("helvetica", "", 10)
     pdf.cell(0, 7, f"Jumlah responden: {b['n_respondents']}  |  Dicetak: {datetime.now().strftime('%d %B %Y')}",
              align="C", ln=1)
@@ -194,6 +202,24 @@ def company_pdf(bundle):
         if c.get("common_flags") and c["common_flags"] != "-":
             pdf.set_font("helvetica", "I", 9)
             _mc(pdf, f"Area yang paling sering muncul pada kelompok ini: {c['common_flags']}.", h=5)
+        members = (b.get("cluster_members") or {}).get(c["cluster"], [])
+        if members:
+            _need_space(pdf, 210)
+            pdf.set_font("helvetica", "B", 8.5)
+            pdf.set_fill_color(242, 240, 250)
+            pdf.cell(70, 6, "Nama", border=1, fill=True)
+            pdf.cell(50, 6, "Departemen", border=1, fill=True)
+            pdf.cell(30, 6, "Indeks", border=1, fill=True, align="C")
+            pdf.cell(110, 6, "Area Rawan", border=1, fill=True, ln=1)
+            pdf.set_font("helvetica", "", 8.5)
+            for nm, dp, ix, ar in members[:15]:
+                pdf.cell(70, 5.5, _safe(nm), border=1)
+                pdf.cell(50, 5.5, _safe(dp or "-"), border=1)
+                pdf.cell(30, 5.5, _safe(str(ix)), border=1, align="C")
+                pdf.cell(110, 5.5, _safe(ar), border=1, ln=1)
+            if len(members) > 15:
+                pdf.set_font("helvetica", "I", 8)
+                _mc(pdf, f"... dan {len(members)-15} karyawan lainnya (lihat sheet Klasterisasi di file Excel).", h=5)
         pdf.ln(2)
 
     # ---- Bagian 4: analisis kebutuhan (soft selling) ----
