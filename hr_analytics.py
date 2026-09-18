@@ -112,3 +112,63 @@ def band_counts(df_scores, cols):
                          low=lo, mid=mid, high=hi,
                          low_label=sem[0], mid_label=sem[1], high_label=sem[2]))
     return rows
+
+
+# ============ SKALA SERAGAM "SEHAT" (semua grafik: tinggi = selalu baik) ============
+FLIP = {"PSS", "MBI_EX", "MBI_CY", "TIS"}  # tes yang skornya dibalik
+
+def healthify(scores):
+    """Ubah skor mentah -> skor kesehatan seragam (tes negatif dibalik)."""
+    return {d: (round(100 - v, 1) if d in FLIP else v) for d, v in scores.items()}
+
+def health_target(dim):
+    d = DIMS[dim]
+    return (100 - d["target"]) if d["dir"] == "bad" else d["target"]
+
+def band_counts_health(df_scores, cols):
+    """Distribusi pada skala sehat seragam: rendah = rawan, tinggi = baik."""
+    rows = []
+    for dim in cols:
+        vals = df_scores[dim].dropna()
+        if vals.empty:
+            continue
+        lo = int((vals < 33).sum()); mid = int(((vals >= 33) & (vals < 66)).sum()); hi = int((vals >= 66).sum())
+        rows.append(dict(dim=dim, label=DIMS[dim]["label"] + ("*" if dim in FLIP else ""),
+                         n=len(vals), dir="good", low=lo, mid=mid, high=hi,
+                         low_label="Rawan", mid_label="Cukup", high_label="Baik"))
+    return rows
+
+def action_category(gap_h, dim):
+    """gap_h = selisih skor sehat vs target sehat (negatif = tertinggal)."""
+    if gap_h >= 0:
+        return "pertahankan"
+    if gap_h >= -15:
+        return "pantau"
+    if dim in {"PSS", "MBI_EX", "MBI_CY", "TIS"}:
+        return "konseling"
+    return "training"
+
+ACTION_META = {
+ "pertahankan": dict(label="Pertahankan + Asesmen Berkala", color="#2E8B57",
+    desc="Kondisi sudah sehat. Yang dibutuhkan: dipertahankan lewat apresiasi, kebiasaan baik yang sudah "
+         "berjalan, dan pengecekan rutin tiap 3-6 bulan agar tidak tergerus diam-diam."),
+ "pantau": dict(label="Pantau Ketat + Asesmen Berkala", color="#F2C14E",
+    desc="Mulai melemah tetapi belum kritis. Perlu observasi, check-in santai antara atasan dan anggota tim, "
+         "dan pengukuran ulang yang lebih sering (misal tiap 1-2 bulan)."),
+ "training": dict(label="Prioritas Training", color="#E67E22",
+    desc="Ketertinggalan terutama pada keterampilan. Area seperti ini paling responsif terhadap pelatihan "
+         "terstruktur yang diikuti praktik berulang di tempat kerja - bukan sekadar teori sekali duduk."),
+ "konseling": dict(label="Prioritas Konseling + Training", color="#C0392B",
+    desc="Menyangkut kesejahteraan (stres, kelelahan emosi, niat keluar). Kombinasi paling efektif: "
+         "pendampingan individu terlebih dahulu untuk menurunkan tekanan, dilanjutkan pelatihan agar "
+         "kondisinya tidak kambuh setelah pendampingan selesai."),
+}
+
+def build_action_plan(gap_rows):
+    """gap_rows dari insights.gap_analysis (gap arah-aware = selisih skor sehat vs target sehat)."""
+    cats = {k: [] for k in ACTION_META}
+    for r in gap_rows:
+        cats[action_category(r["gap"], r["dim"])].append(r)
+    for k in cats:
+        cats[k].sort(key=lambda r: r["gap"])
+    return cats
