@@ -9,10 +9,11 @@ from instruments import INSTRUMENTS, DIMS, DIM_ORDER, INST_SHORT
 from scoring import compute_dim_scores, responses_to_answers, band, group_scores
 from insights import (individual_insights, grouped_insights, gap_analysis,
                       strengths_and_concerns, soft_recommendations, closing_paragraph,
-                      BAND_LABEL, DIRECTION_NOTE, CONSEQUENCE)
-from hr_analytics import clusterize, cluster_summary, band_counts, CLUSTERS, compute_indices
+                      BAND_LABEL, DIRECTION_NOTE, CONSEQUENCE, hr_opening, hr_risks, CAPTIONS, FOLLOWUP)
+from hr_analytics import (clusterize, cluster_summary, band_counts_health, CLUSTERS,
+                          compute_indices, healthify, build_action_plan, FLIP)
 from charts import (radar_chart, bar_chart_targets, dept_chart, cluster_donut,
-                    index_heatmap, band_distribution_chart)
+                    index_heatmap, band_distribution_chart, action_map_chart)
 from pdf_report import individual_pdf, company_pdf
 
 st.set_page_config(page_title="Asesmen EQ | Cerita Jiwa", page_icon="🧠", layout="wide")
@@ -57,18 +58,18 @@ st.sidebar.caption("Cerita Jiwa Training Center")
 page = st.sidebar.radio("Menu", ["📝 Mulai Asesmen", "⬇️ Unduh Hasil Saya", "🔐 Admin"])
 st.sidebar.divider()
 
-BANDS_BAD = {"low": "🟢 baik", "mid": "🟡 waspada", "high": "🔴 risiko"}
-BANDS_GOOD = {"low": "🔴 kekhawatiran", "mid": "🟡 cukup", "high": "🟢 kekuatan"}
+HTAG = {"low": "🔴 perlu perhatian", "mid": "🟡 cukup", "high": "🟢 baik"}
+HLABEL = {"low": "Perlu Perhatian", "mid": "Cukup", "high": "Baik"}
 
 def show_result(name, training_name, dept, job_level, scores):
     st.success(f"Hasil asesmen untuk **{name}** berhasil dihitung.")
     groups = grouped_insights(scores)
+    hsc = healthify(scores)
     c1, c2 = st.columns([1, 1.15])
     with c1:
         fig_bytes = radar_chart(scores, f"Profil {name}")
         st.image(fig_bytes, width=430)
-        st.caption("📝 Arah tes: stres, burnout (kelelahan & sinisme), dan niat keluar "
-                   "→ **makin rendah makin baik**. Tes lainnya → makin tinggi makin baik.")
+        st.caption(CAPTIONS["radar"])
     with c2:
         st.subheader("Ringkasan per Tes")
         for key, title, plain, rows in groups:
@@ -76,9 +77,11 @@ def show_result(name, training_name, dept, job_level, scores):
                 tbl = []
                 for label, b, text in rows:
                     dim = next(d for d in DIM_ORDER if DIMS[d]["label"] == label)
-                    tag = (BANDS_BAD if DIMS[dim]["dir"] == "bad" else BANDS_GOOD)[b]
-                    tbl.append(dict(Aspek=label, Skor=f"{scores[dim]:.0f}",
-                                    Kategori=BAND_LABEL[b], Status=tag))
+                    hb = band(hsc[dim])
+                    tbl.append(dict(Aspek=label + ("*" if dim in FLIP else ""),
+                                    Skor=f"{hsc[dim]:.0f}",
+                                    Kategori=HLABEL[hb], Status=HTAG[hb],
+                                    Catatan=("* skor dibalik" if dim in FLIP else "-")))
                 st.dataframe(pd.DataFrame(tbl), hide_index=True, use_container_width=True)
         pdf_bytes = individual_pdf(name, training_name, dept, job_level, scores, groups, fig_bytes)
         st.download_button("⬇️ Download Laporan PDF Saya", data=pdf_bytes,
@@ -255,17 +258,20 @@ else:
                         strengths, concerns = strengths_and_concerns(gap_rows)
                         recs = soft_recommendations(priority)
 
+                        st.markdown(hr_opening(tname, len(df_scores), *strengths_and_concerns(gap_analysis(mean_scores)[0]),
+                                               cluster_summary(clusterize(df_scores))))
                         c1, c2 = st.columns(2)
                         radar_png = radar_chart(mean_scores, f"Profil Rata-rata {tname}", dims=cols)
                         with c1:
                             st.image(radar_png, width=400)
-                            st.caption("Merah = tes yang makin rendah makin baik (stres, burnout, niat keluar). Ungu = makin tinggi makin baik.")
+                            st.caption("Gambar 1. " + CAPTIONS["radar"])
                         idx_df = clusterize(df_scores)
                         counts = idx_df["cluster"].value_counts().to_dict()
                         donut_png = cluster_donut(counts)
                         with c2:
                             if donut_png:
                                 st.image(donut_png, width=400)
+                                st.caption("Gambar 2. " + CAPTIONS["donut"])
 
                         # ---- klasterisasi ----
                         st.subheader("👥 Klasterisasi Profil Karyawan")
@@ -278,6 +284,7 @@ else:
                         heat_png = index_heatmap(idx_df)
                         if heat_png:
                             st.image(heat_png, use_container_width=True)
+                            st.caption("Gambar 4. " + CAPTIONS["heat"])
                         for cid in [1, 2, 3, 4]:
                             sub = idx_df[idx_df["cluster"] == cid]
                             if sub.empty:
@@ -294,11 +301,15 @@ else:
 
                         # ---- distribusi kategori ----
                         st.subheader("📶 Distribusi Kategori per Dimensi")
-                        st.caption("Hijau selalu = kondisi baik, merah = perlu perhatian (sudah dikoreksi arah tiap tes).")
-                        band_rows = band_counts(df_scores, cols)
+                        df_h = df_scores.copy()
+                        for d in cols:
+                            if d in FLIP:
+                                df_h[d] = 100 - df_h[d]
+                        band_rows = band_counts_health(df_h, cols)
                         band_png = band_distribution_chart(band_rows)
                         if band_png:
                             st.image(band_png, use_container_width=True)
+                            st.caption("Gambar 3. " + CAPTIONS["band"])
 
                         # ---- analisis kebutuhan (soft selling) ----
                         st.subheader("🎯 Analisis Kebutuhan & Rekomendasi Pengembangan")
@@ -320,6 +331,31 @@ else:
                         st.info(closing_paragraph(len(concerns)))
 
                         # ---- download ----
+                        st.subheader("⚠️ Risiko yang Perlu Diwaspadai")
+                        st.caption("Angka diterjemahkan menjadi konsekuensi bisnis - bersifat preventif, masih ada waktu bertindak.")
+                        for s in hr_risks(concerns):
+                            st.markdown(f"- {s}")
+
+                        st.subheader("🗺️ Peta Tindak Lanjut & Rekomendasi Pengembangan")
+                        action_cats = build_action_plan(gap_rows)
+                        action_png = action_map_chart(action_cats)
+                        if action_png:
+                            st.image(action_png, use_container_width=True)
+                            st.caption("Gambar 5. " + CAPTIONS["action"])
+                        from hr_analytics import ACTION_META
+                        for cat in ["konseling", "training", "pantau", "pertahankan"]:
+                            rows_cat = action_cats.get(cat) or []
+                            if not rows_cat:
+                                continue
+                            with st.expander(f"**{ACTION_META[cat]['label']}** ({len(rows_cat)} aspek)"):
+                                st.markdown(f"*{ACTION_META[cat]['desc']}*")
+                                for r in rows_cat:
+                                    fu = FOLLOWUP.get(r["dim"], "")
+                                    line = (f"- **{r['label']}** (selisih {abs(r['gap']):.0f} poin) → {r['rekomendasi']}.")
+                                    if cat in ("konseling", "training") and fu:
+                                        line += f" *Asesmen lanjutan: {fu}*"
+                                    st.markdown(line)
+
                         st.subheader("📦 Download")
                         ec1, ec2, ec3 = st.columns(3)
                         idx_out = idx_df.copy()
@@ -334,12 +370,15 @@ else:
                         ec1.download_button("⬇️ Excel (skor + klaster + responden + gap)", excel_buf.getvalue(),
                                             file_name=f"Report_{tname}.xlsx",
                                             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                        h_mean = healthify(mean_scores)
                         grouped = []
                         for key, title, plain, grows in grouped_insights(mean_scores):
                             trows = []
                             for label, b, text in grows:
                                 dim = next(d for d in DIM_ORDER if DIMS[d]["label"] == label)
-                                trows.append((label, mean_scores[dim], DIMS[dim]["dir"], DIRECTION_NOTE[DIMS[dim]["dir"]]))
+                                note = ("* skor asli dibalik agar searah: makin tinggi = makin sehat"
+                                        if dim in FLIP else "makin tinggi = makin baik")
+                                trows.append((label, h_mean[dim], mean_scores[dim], DIMS[dim]["dir"], note))
                             grouped.append((key, title, plain, trows))
                         cluster_members = {}
                         for cid in [1, 2, 3, 4]:
@@ -354,6 +393,9 @@ else:
                             grouped=grouped, gap_rows=gap_rows,
                             strengths=strengths, concerns=concerns, recommendations=recs,
                             cluster_summary=csum, cluster_members=cluster_members,
+                            opening=hr_opening(tname, len(df_scores), strengths, concerns, csum),
+                            risks=hr_risks(concerns),
+                            action_cats=action_cats, action_png=action_png,
                             closing=closing_paragraph(len(concerns)))
                         comp_pdf = company_pdf(bundle)
                         ec2.download_button("⬇️ PDF Report Perusahaan", comp_pdf,
