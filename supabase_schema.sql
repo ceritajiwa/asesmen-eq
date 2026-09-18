@@ -4,8 +4,13 @@ create table if not exists public.trainings (
   id uuid primary key default gen_random_uuid(),
   name text not null,
   access_code text,
+  enabled_instruments text default '["PSS","MBI","WLEIS","UWES","TIS","PSQ"]',
   created_at timestamptz not null default now()
 );
+
+-- >>> JIKA DATABASE LAMA (sudah punya tabel trainings), jalankan 2 baris ini saja: <<<
+alter table public.trainings add column if not exists enabled_instruments text;
+update public.trainings set enabled_instruments = '["PSS","MBI","WLEIS","UWES","TIS","PSQ"]' where enabled_instruments is null;
 
 create table if not exists public.respondents (
   id uuid primary key default gen_random_uuid(),
