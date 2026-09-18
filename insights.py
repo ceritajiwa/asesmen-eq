@@ -1,3 +1,4 @@
+
 # -*- coding: utf-8 -*-
 """Interpretasi hasil - bahasa manusia, hangat, mudah dipahami awam +
 narasi soft-selling untuk kebutuhan pengembangan."""
@@ -371,3 +372,119 @@ def closing_paragraph(n_prioritas):
             "Dengan dukungan yang tepat, aspek-aspek ini justru menjadi peluang terbesar untuk naik kelas. "
             "Kami sarankan pengukuran berulang (misalnya sebelum dan sesudah program) agar perkembangan "
             "terlihat nyata dan terukur.")
+
+
+# ============ KONTEN KHUSUS REPORT HR (insight dalam + risiko + caption) ============
+
+# Risiko bisnis per dimensi (untuk bagian "Risiko yang Perlu Diwaspadai")
+RISK = {
+ "PSS": "Secara bisnis, stres kronis adalah biaya tersembunyi yang paling jarang dihitung: kualitas keputusan "
+        "menurun, kesalahan kerja naik, dan absensi mulai meningkat pelan-pelan. Yang paling berbahaya: "
+        "karyawan yang stres biasanya tetap masuk kerja (presenteeism) - badannya di kantor, pikirannya tidak.",
+ "MBI_EX": "Karyawan yang kelelahan emosinya tinggi adalah kandidat resign paling 'senyap'. Mereka jarang "
+        "mengeluh - mereka hanya makin dingin, makin pelan, lalu suatu hari menyerahkan surat. Biaya pergantian "
+        "satu karyawan bisa mencapai 6-9 bulan gajinya, belum termasuk beban kerja yang berpindah ke rekan lain.",
+ "MBI_CY": "Sinisme menular dalam tim lebih cepat dari semangat. Satu orang yang merasa 'buat apa berusaha' "
+        "bisa menurunkan energi seluruh mejanya dalam hitungan minggu - terutama jika orang itu adalah "
+        "panutan atau anggota paling senior.",
+ "MBI_PE": "Ketika rasa mampu menurun, perusahaan kehilangan inisiatif tanpa kehilangan orangnya. Karyawan "
+        "yang ragu pada kemampuannya tidak akan mengusulkan ide, tidak akan mengambil proyek menantang, dan "
+        "akan memilih 'aman' di setiap kesempatan - padahal pertumbuhan perusahaan lahir dari orang yang berani.",
+ "SEA": "Karyawan yang tidak mengenali emosinya sendiri adalah 'mesin tanpa indikator': mereka bisa "
+        "meledak di meeting penting, membuat keputusan di bawah amarah, atau membawa masalah pribadi ke "
+        "ruang kerja - semuanya tanpa peringatan. Konflik yang seharusnya kecil jadi besar karena tidak ada "
+        "jeda antara rasa dan reaksi.",
+ "OEA": "Ketidakpekaan terhadap emosi orang lain adalah pemicu miskomunikasi terbesar: instruksi yang "
+        "diberikan tanpa membaca kondisi penerima, feedback yang terasa seperti serangan, dan konflik yang "
+        "sebenarnya cuma kebutuhan untuk didengar. Di level tim, ini berarti banyak masalah kecil yang "
+        "dibiarkan membesar karena tidak ada yang peka mendeteksinya.",
+ "ROE": "Tim dengan regulasi emosi yang lemah hidup dalam mode 'api-unggun': konflik kecil menyala terus di "
+        "bawah permukaan, meeting terasa tegang, dan energi kreatif habis untuk menjaga amarah, bukan untuk "
+        "bekerja. Turnover di tim seperti ini hampir selalu lebih tinggi dari rata-rata perusahaan.",
+ "UOE": "Tanpa kemampuan mengubah emosi jadi dorongan, target perusahaan hidup sebagai angka di slide - "
+        "diketahui semua orang, dirasakan tidak ada. Karyawan yang kehilangan bahan bakar dari dalam hanya "
+        "bergerak saat diawasi, dan berhenti tepat saat pengawasan berhenti.",
+ "VIG": "Energi rendah adalah produktivitas yang hilang tanpa jejak: pekerjaan yang biasanya selesai 2 jam "
+        "jadi 4 jam, meeting jadi tidak menghasilkan, dan 'capek' menjadi alasan yang makin sering terdengar. "
+        "Jika ini dibiarkan di banyak orang sekaligus, biasanya ada akar sistemik: beban, jadwal, atau budaya "
+        "yang perlu diperbaiki - bukan sekadar masalah individu.",
+ "DED": "Kehilangan makna adalah awal dari 'karyawan hantu': hadir di semua meeting, menyelesaikan semua "
+        "tugas, tetapi tanpa kepemilikan. Karyawan seperti ini tidak akan pernah mengeluh - mereka hanya "
+        "tidak akan pernah memberi lebih. Dan perusahaan yang tidak pernah mendapatkan 'lebih' dari "
+        "karyawannya akan selalu kalah dari pesaing yang bisa.",
+ "ABS": "Tanpa kemampuan fokus, perusahaan membayar 8 jam kerja tetapi hanya menerima 4-5 jam hasil. "
+        "Pekerjaan berkualitas butuh blok waktu tanpa gangguan - jika karyawan tidak pernah mencapai fokus "
+        "penuh, output mereka akan selalu berada di bawah kemampuan sebenarnya.",
+ "TIS": "Niat keluar adalah aset yang sedang mengalir keluar lewat keran yang tidak terlihat. Setiap "
+        "karyawan berniat kuat untuk pergi yang tidak tertahan akan membawa: pengetahuan proses, relasi "
+        "dengan klien, dan - yang paling mahal - keyakinan rekan-rekannya bahwa 'di sini tidak layak bertahan'.",
+ "PSQ": "Tim tanpa rasa aman psikologis adalah tim yang buta terhadap masalahnya sendiri. Karyawan diam bukan "
+        "karena tidak ada masalah, tetapi karena berbicara terasa berisiko. Akibatnya: kesalahan ditemukan "
+        "klien sebelum ditemukan internal, ide perbaikan mati di tenggorokan, dan keputusan penting diambil "
+        "berdasarkan apa yang 'aman dibbilang', bukan apa yang benar.",
+}
+
+# Panduan membaca setiap grafik (tampil di bawah gambar)
+CAPTIONS = {
+ "radar": "Cara membaca: semakin jauh titik dari pusat, semakin sehat kondisi karyawan pada aspek itu. "
+          "Bentuk yang melebar ke kanan-atas menandakan kondisi baik; 'cekung' di satu sisi menunjukkan "
+          "area yang perlu perhatian. Skala sudah diseragamkan: makin tinggi = makin baik.",
+ "donut": "Cara membaca: seluruh karyawan dikelompokkan ke 4 profil berdasarkan jumlah aspek yang menunjukkan "
+          "sinyal rawan. Donat yang didominasi hijau/kuning berarti mayoritas karyawan dalam kondisi baik; "
+          "irisan oranye/merah menunjukkan siapa yang perlu ditindaklanjuti lebih dulu.",
+ "heat":  "Cara membaca: setiap baris adalah satu karyawan, setiap kolom satu aspek. Hijau = sehat, kuning = "
+          "cukup, merah = rawan. Lihat pola: baris yang penuh merah butuh perhatian segera; kolom yang "
+          "banyak merahnya menandakan masalah sistemik di level tim, bukan individu.",
+ "band":  "Cara membaca: untuk setiap aspek, batang menunjukkan persentase karyawan di tiap kategori. "
+          "Hijau selalu berarti baik, merah selalu berarti perlu perhatian (skor tes yang arahnya terbalik "
+          "sudah dibalik otomatis). Aspek dengan porsi merah/kuning besar adalah kandidat intervensi.",
+ "action":"Cara membaca: batang adalah skor kesehatan rata-rata, garis putus-putus adalah target sehat. "
+          "Warna menentukan tindak lanjut: hijau = pertahankan, kuning = pantau, oranye = prioritas training, "
+          "merah = prioritas konseling + training. Semakin jauh batang di kiri garis, semakin mendesak.",
+ "dept":  "Cara membaca: membandingkan rata-rata antar departemen. Jika satu departemen konsisten lebih "
+          "merah di banyak aspek, masalahnya kemungkinan pada kepemimpinan atau beban departemen itu - "
+          "bukan pada individu-individunya.",
+}
+
+# Saran asesmen lanjutan (sederhana, berguna, tidak complicated)
+FOLLOWUP = {
+ "PSS":    "Survei Sumber Stres (stressor mapping) 10 menit - untuk memastikan stresnya datang dari beban kerja, relasi atasan, atau sistem.",
+ "MBI_EX": "Audit beban kerja + cek keadilan distribusi tugas per orang.",
+ "MBI_CY": "Survei makna kerja singkat + sesi fokus grup dengan anggota tim.",
+ "MBI_PE": "Cek kejelasan peran (role clarity) dan frekuensi umpan balik dari atasan langsung.",
+ "SEA":    "DERS-16 (Difficulties in Emotion Regulation) - memetakan secara spesifik titik lemah dalam mengenali & mengatur emosi.",
+ "OEA":    "Survei iklim komunikasi tim (bagaimana feedback biasanya diberikan dan diterima).",
+ "ROE":    "DERS-16 + observasi pola konflik dalam meeting untuk melihat pemicu regulasi emosi.",
+ "UOE":    "Wellness pulse check bulanan (5 menit) untuk memantau energi dan motivasi.",
+ "VIG":    "Cek pola istirahat, beban meeting, dan jam kerja aktual vs kontrak.",
+ "DED":    "Survei makna & kebanggaan kerja + stay conversation dengan karyawan bernilai kritis.",
+ "ABS":    "Observasi pola gangguan kerja (notifikasi, meeting dadakan) + percobaan blok fokus 2 minggu.",
+ "TIS":    "Stay interview terstruktur untuk karyawan berisiko keluar (15-20 menit per orang).",
+ "PSQ":    "Survei psychological safety mendalam per tim + observasi cara leader menanggapi kabar buruk.",
+}
+
+def hr_opening(training_name, n, strengths, concerns, csum):
+    """Paragraf pembuka panjang, bahasa manusia, untuk HR awam."""
+    cl_text = ", ".join(f"{c['n']} orang {c['label']}" for c in csum) if csum else ""
+    if concerns:
+        top = concerns[0]
+        fokus = (f"Hal yang paling menonjol dan layak didengar adalah **{top['label'].lower()}** "
+                 f"- bukan untuk dipermasalahkan, tetapi karena inilah area yang paling berdampak "
+                 f"jika ditangani, dan paling berisiko jika dibiarkan.")
+    else:
+        fokus = ("Secara keseluruhan kondisi tim berada di jalur yang sehat - dan ini patut diapresiasi, "
+                 "karena tidak banyak perusahaan yang berani mengukur dan menemukan kabar baik.")
+    return (f"Report ini adalah potret kondisi psikologis **{n} karyawan {training_name}** pada satu titik waktu - "
+            f"bukan rapor, bukan vonis, dan bukan alat menilai siapa salah. Angka-angka di halaman-halaman "
+            f"berikutnya adalah cara paling jujur untuk mendengar apa yang biasanya tidak diucapkan karyawan "
+            f"di ruang meeting: seberapa berat beban yang mereka pikul, seberapa besar energi yang masih mereka "
+            f"miliki, dan seberapa kuat keinginan mereka untuk bertahan. Dari komposisi kelompoknya, "
+            f"saat ini tim tersusun atas: {cl_text}. {fokus} Semua penjelasan disusun dengan bahasa yang "
+            f"bisa langsung dipakai untuk percakapan dengan manajemen - tanpa istilah teknis yang berbelit.")
+
+def hr_risks(concerns):
+    """Daftar kalimat risiko untuk dimensi yang di bawah target (maks 5)."""
+    out = []
+    for r in concerns[:5]:
+        out.append(f"**{r['label']}** - {RISK[r['dim']]}")
+    return out
