@@ -13,6 +13,16 @@ from pdf_report import individual_pdf, company_pdf, BAND_LABEL
 
 st.set_page_config(page_title="Asesmen EQ | Cerita Jiwa", page_icon="🧠", layout="wide")
 
+# ===== SEMBUNYIKAN ELEMEN STREAMLIT =====
+st.markdown("""
+<style>
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    #MainMenu {visibility: hidden;}
+    [data-testid="stStatusWidget"] {display: none;}
+</style>
+""", unsafe_allow_html=True)
+
 ALL_KEYS = [i["key"] for i in INSTRUMENTS]
 INST_MAP = {i["key"]: i for i in INSTRUMENTS}
 LABEL2KEY = {v: k for k, v in INST_SHORT.items()}
