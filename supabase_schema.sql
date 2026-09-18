@@ -36,3 +36,16 @@ create index if not exists idx_resp_email on public.respondents(email);
 
 -- ===== Contoh data (opsional) =====
 -- insert into public.trainings (name, access_code) values ('Zurich', 'ZURICH2026'), ('CERC', 'CERC2026');
+
+-- ===== Tabel riwayat ujian sertifikasi (jalankan SEKALI di SQL Editor) =====
+create table if not exists public.exam_attempts (
+  id bigint generated always as identity primary key,
+  training_id uuid not null references public.trainings(id) on delete cascade,
+  full_name text not null,
+  email text not null,
+  correct int not null,
+  score int not null,
+  passed boolean not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_exam_training on public.exam_attempts(training_id);
