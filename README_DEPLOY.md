@@ -87,6 +87,23 @@ Semua skor dinormalisasi 0-100 agar comparable antar instrumen.
 2. Di layar hasil, klik **⬇️ Download Laporan PDF Saya**.
 3. Kapan saja bisa kembali lewat **⬇️ Unduh Hasil Saya** (pilih training + email).
 
+## Fitur v2 (update terbaru)
+
+1. **Asesmen selektif per training.** Admin bisa memilih asesmen apa saja yang
+   aktif untuk tiap training (mis. CERC = 6 asesmen penuh, Zurich = hanya
+   PSS + MBI + WLEIS). Jumlah pertanyaan, radar chart, gap analysis, dan PDF
+   menyesuaikan otomatis. Atur di **Admin → 🏢 Kelola Training** (tambah/edit).
+2. **Tombol "Masuk ke Asesmen".** Peserta memasukkan kode akses lalu menekan
+   tombol untuk masuk (tidak otomatis lagi).
+3. **Edit kode akses & asesmen** untuk training yang sudah ada (mis. ganti
+   kode akses CERC) di tab Kelola Training.
+4. **Data dummy.** **Admin → 🧪 Data Dummy**: generate responden fiktif
+   ("Dummy 01 ...") dengan jawaban acak berdistribusi campuran untuk testing
+   report tanpa peserta sungguhan. Bisa dihapus semua dengan satu tombol.
+5. **Migrasi database:** kalau database lama, jalankan 2 baris `alter/update`
+   di bagian atas `supabase_schema.sql` (ada tanda `>>>`) sekali saja di
+   SQL Editor Supabase.
+
 ## Catatan Penting
 
 1. **MBI-GS & lisensi.** MBI-GS adalah properti Mind Garden, Inc. Gratis untuk
