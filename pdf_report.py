@@ -1,4 +1,3 @@
-
 # -*- coding: utf-8 -*-
 import io
 from datetime import datetime
@@ -35,7 +34,7 @@ def _img(pdf, png_bytes, **kw):
 BAND_LABEL = {"low": "Rendah", "mid": "Sedang", "high": "Tinggi"}
 
 def _safe(s):
-    return s.replace("\u2019", "'").replace("\u2018", "'").replace("\u201c", '"').replace("\u201d", '"')
+    return s.replace("'", "'").replace("'", "'").replace(""", '"').replace(""", '"')
 
 def individual_pdf(name, training_name, dept, job_level, scores, insights_list, radar_png):
     pdf = BasePDF()
@@ -86,16 +85,16 @@ def individual_pdf(name, training_name, dept, job_level, scores, insights_list, 
     pdf.set_text_color(30, 30, 30)
     for label, b, text in insights_list:
         pdf.set_font("helvetica", "B", 9.5)
-        pdf.multi_cell(0, 5.5, _safe(f"{label} ({BAND_LABEL[b]})"))
+        pdf.multi_cell(0, 5.5, _safe(f"{label} ({BAND_LABEL[b]})"), new_x="LMARGIN", new_y="NEXT")
         pdf.set_font("helvetica", "", 9.5)
-        pdf.multi_cell(0, 5.5, _safe(text))
+        pdf.multi_cell(0, 5.5, _safe(text), new_x="LMARGIN", new_y="NEXT")
         pdf.ln(1.5)
 
     pdf.set_font("helvetica", "I", 9)
     pdf.set_text_color(120, 120, 120)
     pdf.multi_cell(0, 5, _safe("Catatan: Hasil asesmen bersifat rahasia dan digunakan untuk pengembangan "
         "kapasitas emosional. Skor 0-100 dinormalisasi antar instrumen agar dapat dibandingkan. "
-        "Instrumen: PSS-10, MBI-GS, WLEIS, UWES-9, TIS-6, PSQ-ORG."))
+        "Instrumen: PSS-10, MBI-GS, WLEIS, UWES-9, TIS-6, PSQ-ORG."), new_x="LMARGIN", new_y="NEXT")
     res = pdf.output()
     return res.encode("latin-1") if isinstance(res, str) else bytes(res)
 
@@ -142,7 +141,7 @@ def company_pdf(training_name, n_respondents, mean_scores, radar_png, bar_png, d
     pdf.set_text_color(30, 30, 30)
     pdf.set_font("helvetica", "", 9.5)
     for s in summary_sentences:
-        pdf.multi_cell(0, 5.5, _safe(s))
+        pdf.multi_cell(0, 5.5, _safe(s), new_x="LMARGIN", new_y="NEXT")
     pdf.ln(2)
     if dept_png:
         if pdf.get_y() > 150:
