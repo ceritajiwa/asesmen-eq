@@ -34,7 +34,8 @@ def _img(pdf, png_bytes, **kw):
     except OSError: pass
 
 def _safe(s):
-    return (str(s).replace("'", "'").replace("'", "'")
+    return (str(s).replace("**", "")
+            .replace("'", "'").replace("'", "'")
             .replace(""", '"').replace(""", '"')
             .replace("–", "-").replace("—", "-"))
 
@@ -44,6 +45,15 @@ def _mc(pdf, text, h=5.5, size=None, style=""):
         pdf.multi_cell(0, h, _safe(text), new_x="LMARGIN", new_y="NEXT")
     except TypeError:
         pdf.multi_cell(0, h, _safe(text))
+
+def _img_fit(pdf, png, x, w):
+    """Pasang gambar lalu geser kursor tepat di bawahnya (dihitung dari rasio asli PNG)."""
+    from PIL import Image as _Im
+    im = _Im.open(io.BytesIO(png))
+    h = w * im.height / im.width
+    y0 = pdf.get_y()
+    _img(pdf, png, x=x, y=y0, w=w)
+    pdf.set_y(y0 + h + 2)
 
 def _cap(pdf, text):
     pdf.set_font("helvetica", "I", 8.5)
@@ -135,10 +145,18 @@ def company_pdf(bundle):
     if b.get("opening"):
         _mc(pdf, b["opening"], h=5.5, size=10)
         pdf.ln(2)
-    _img(pdf, b["radar_png"], x=15, y=pdf.get_y(), w=105)
+    from PIL import Image as _Im
+    hs = []
+    for png, w in ([(b["radar_png"], 105)] + ([(b["donut_png"], 122)] if b.get("donut_png") else [])):
+        im = _Im.open(io.BytesIO(png))
+        hs.append(w * im.height / im.width)
+    if pdf.get_y() + max(hs) + 28 > 200:
+        pdf.add_page("L")
+    y0 = pdf.get_y()
+    _img(pdf, b["radar_png"], x=15, y=y0, w=105)
     if b.get("donut_png"):
-        _img(pdf, b["donut_png"], x=150, y=pdf.get_y(), w=125)
-    pdf.ln(88)
+        _img(pdf, b["donut_png"], x=148, y=y0, w=122)
+    pdf.set_y(y0 + max(hs) + 3)
     _cap(pdf, "Gambar 1 (kiri): " + CAPTIONS["radar"])
     if b.get("donut_png"):
         _cap(pdf, "Gambar 2 (kanan): " + CAPTIONS["donut"])
@@ -178,20 +196,26 @@ def company_pdf(bundle):
     pdf.cell(0, 9, "2. Distribusi Kategori Karyawan per Dimensi", ln=1)
     pdf.set_text_color(30, 30, 30)
     if b.get("band_png"):
-        _img(pdf, b["band_png"], x=40, y=pdf.get_y(), w=200)
-        pdf.ln(105)
+        if pdf.get_y() > 55:
+            pdf.add_page("L")
+            pdf.set_font("helvetica", "B", 14); pdf.set_text_color(91, 78, 158)
+            pdf.cell(0, 9, "2. Distribusi Kategori Karyawan per Dimensi (lanjutan)", ln=1)
+            pdf.set_text_color(30, 30, 30)
+        _img_fit(pdf, b["band_png"], x=52, w=182)
     _cap(pdf, "Gambar 3: " + CAPTIONS["band"])
     pdf.ln(3)
 
-    # ---- Bagian 3: klasterisasi ----
-    _need_space(pdf, 150)
+    # ---- Bagian 3: klasterisasi (selalu halaman baru) ----
+    pdf.add_page("L")
+    pdf.set_font("helvetica", "B", 14); pdf.set_text_color(91, 78, 158)
+    pdf.cell(0, 9, "3. Klasterisasi Profil Karyawan", ln=1)
+    pdf.set_text_color(30, 30, 30)
     pdf.set_font("helvetica", "B", 14)
     pdf.set_text_color(91, 78, 158)
     pdf.cell(0, 9, "3. Klasterisasi Profil Karyawan", ln=1)
     pdf.set_text_color(30, 30, 30)
     if b.get("heat_png"):
-        _img(pdf, b["heat_png"], x=60, y=pdf.get_y(), w=170)
-        pdf.ln(120)
+        _img_fit(pdf, b["heat_png"], x=60, w=170)
     _cap(pdf, "Gambar 4: " + CAPTIONS["heat"])
     pdf.ln(2)
     for c in b["cluster_summary"]:
@@ -234,9 +258,9 @@ def company_pdf(bundle):
              "preventif - artinya masih ada waktu untuk bertindah sebelum berubah menjadi biaya nyata.",
         h=5.5, size=9.5)
     pdf.ln(1)
-    for s in b.get("risks", []):
-        _mc(pdf, s, h=5.5, size=9.5)
-        pdf.ln(1)
+    for i, s in enumerate(b.get("risks", []), 1):
+        _mc(pdf, f"{i}. {s}", h=5.5, size=9.5)
+        pdf.ln(1.5)
 
     # ---- Bagian 5: peta tindak lanjut ----
     pdf.add_page("L")
@@ -245,8 +269,7 @@ def company_pdf(bundle):
     pdf.cell(0, 9, "5. Peta Tindak Lanjut & Rekomendasi Pengembangan", ln=1)
     pdf.set_text_color(30, 30, 30)
     if b.get("action_png"):
-        _img(pdf, b["action_png"], x=25, y=pdf.get_y(), w=230)
-        pdf.ln(120)
+        _img_fit(pdf, b["action_png"], x=28, w=228)
     _cap(pdf, "Gambar 5: " + CAPTIONS["action"])
     pdf.ln(2)
     cats = b.get("action_cats") or {}
@@ -272,8 +295,8 @@ def company_pdf(bundle):
     pdf.set_font("helvetica", "B", 11)
     _mc(pdf, "Penutup", h=6)
     pdf.set_font("helvetica", "", 9.5)
-    for s in b["recommendations"]:
-        _mc(pdf, s.lstrip("- "), h=5.5)
+    for i, s in enumerate(b["recommendations"], 1):
+        _mc(pdf, f"{i}. {s.lstrip('- ')}", h=5.5)
     pdf.ln(2)
     pdf.set_font("helvetica", "I", 9)
     _mc(pdf, b["closing"], h=5)
