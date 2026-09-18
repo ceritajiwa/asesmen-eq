@@ -16,10 +16,16 @@ st.set_page_config(page_title="Asesmen EQ | Cerita Jiwa", page_icon="🧠", layo
 # ===== SEMBUNYIKAN ELEMEN STREAMLIT =====
 st.markdown("""
 <style>
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
-    #MainMenu {visibility: hidden;}
-    [data-testid="stStatusWidget"] {display: none;}
+    footer, [data-testid="stFooter"],
+    [data-testid="stBottom"], [data-testid="stBottomBlockContainer"],
+    [data-testid="stStatusWidget"], [data-testid="stAppDeployButton"],
+    header, #MainMenu {
+        display: none !important;
+    }
+    /* Footer & tombol fullscreen versi terbaru (class hash) */
+    div[class*="_hostedName_"], div[class*="1upux"] {
+        display: none !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
