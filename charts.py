@@ -5,14 +5,18 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 from instruments import DIMS, DIM_ORDER
-from hr_analytics import CLUSTERS, INDEX_COMPONENTS
+from hr_analytics import (CLUSTERS, INDEX_COMPONENTS, FLIP, healthify,
+                          health_target, ACTION_META)
 
 COLORS = {"bad": "#D9534F", "good": "#5B4E9E"}
+SCALE_NOTE = "skala seragam: makin tinggi = makin sehat"
 
 def radar_chart(scores: dict, title: str, dims=None, figsize=(7, 7)):
-    dims = dims if dims is not None else [d for d in DIM_ORDER if d in scores]
-    labels = [DIMS[d]["radar"] for d in dims]
-    vals = [scores[d] for d in dims]
+    """Radar pada skala sehat seragam (tes negatif otomatis dibalik, ditandai *)."""
+    h = healthify(scores)
+    dims = dims if dims is not None else [d for d in DIM_ORDER if d in h]
+    labels = [DIMS[d]["radar"] + ("*" if d in FLIP else "") for d in dims]
+    vals = [h[d] for d in dims]
     N = len(labels)
     ang = np.linspace(0, 2*np.pi, N, endpoint=False).tolist()
     vals_c = vals + vals[:1]; ang_c = ang + ang[:1]
@@ -25,28 +29,27 @@ def radar_chart(scores: dict, title: str, dims=None, figsize=(7, 7)):
     for a, v in zip(ang, vals):
         ax.annotate(f"{v:.0f}", (a, v), textcoords="offset points",
                     xytext=(0, 6), ha="center", fontsize=9, fontweight="bold", color="#5B4E9E")
-    ax.set_title(title, fontsize=13, fontweight="bold", pad=22)
+    ax.set_title(title + "\n(" + SCALE_NOTE + "; * = skor asli dibalik)", fontsize=12, fontweight="bold", pad=24)
     fig.tight_layout()
     return _to_png(fig)
 
 def bar_chart_targets(mean_scores: dict, title: str, dims=None, figsize=(9, 6)):
-    """Bar horizontal: skor rata-rata vs target per dimensi (warna mengikuti arah tes)."""
-    dims = dims if dims is not None else [d for d in DIM_ORDER if d in mean_scores]
-    labels = [DIMS[d]["label"] for d in dims]
-    vals = [mean_scores[d] for d in dims]
-    targets = [DIMS[d]["target"] for d in dims]
-    colors = [COLORS[DIMS[d]["dir"]] for d in dims]
+    """Skor sehat rata-rata vs target sehat - satu arah, satu warna."""
+    h = healthify(mean_scores)
+    dims = dims if dims is not None else [d for d in DIM_ORDER if d in h]
+    labels = [DIMS[d]["label"] + ("*" if d in FLIP else "") for d in dims]
+    vals = [h[d] for d in dims]
+    targets = [health_target(d) for d in dims]
     y = np.arange(len(dims))[::-1]
     fig, ax = plt.subplots(figsize=figsize)
-    ax.barh(y, vals, color=colors, alpha=0.85, height=0.6)
+    ax.barh(y, vals, color="#5B4E9E", alpha=0.85, height=0.6)
     for yi, t in zip(y, targets):
         ax.plot([t, t], [yi-0.35, yi+0.35], color="black", linewidth=2, linestyle="--")
     for yi, v in zip(y, vals):
         ax.text(v + 1.5, yi, f"{v:.0f}", va="center", fontsize=9, fontweight="bold")
     ax.set_yticks(y); ax.set_yticklabels(labels, fontsize=9)
-    ax.set_xlim(0, 105); ax.set_xlabel("Skor (0-100)", fontsize=9)
-    ax.set_title(title + "\n(garis putus-putus = target; merah = tes yang makin rendah makin baik)",
-                 fontsize=11, fontweight="bold")
+    ax.set_xlim(0, 105); ax.set_xlabel("Skor kesehatan (0-100, " + SCALE_NOTE + ")", fontsize=9)
+    ax.set_title(title + "\n(garis putus-putus = target sehat)", fontsize=11, fontweight="bold")
     ax.grid(axis="x", alpha=0.25)
     fig.tight_layout()
     return _to_png(fig)
@@ -68,8 +71,8 @@ def dept_chart(df_scores, dept_map: dict, title: str, dims=None, figsize=(9, 6))
     for i, dept in enumerate(depts):
         ax.bar(x + i*width, means.loc[dept, dims], width=width, label=dept, color=palette[i % 10])
     ax.set_xticks(x + width*(len(depts)-1)/2)
-    ax.set_xticklabels([DIMS[d]["radar"] for d in dims], fontsize=8, rotation=30, ha="right")
-    ax.set_ylim(0, 100); ax.set_ylabel("Skor rata-rata (0-100)")
+    ax.set_xticklabels([DIMS[d]["radar"] + ("*" if d in FLIP else "") for d in dims], fontsize=8, rotation=30, ha="right")
+    ax.set_ylim(0, 100); ax.set_ylabel("Skor kesehatan rata-rata (0-100)")
     ax.set_title(title, fontsize=12, fontweight="bold")
     ax.legend(fontsize=8)
     ax.grid(axis="y", alpha=0.25)
@@ -77,7 +80,6 @@ def dept_chart(df_scores, dept_map: dict, title: str, dims=None, figsize=(9, 6))
     return _to_png(fig)
 
 def cluster_donut(counts: dict, title="Klasterisasi Karyawan", figsize=(6.5, 6.5)):
-    """Donut jumlah karyawan per klaster."""
     ids = [i for i in [1, 2, 3, 4] if counts.get(i, 0) > 0]
     if not ids:
         return None
@@ -96,13 +98,12 @@ def cluster_donut(counts: dict, title="Klasterisasi Karyawan", figsize=(6.5, 6.5
 
 def index_heatmap(idx_df, title="Peta Indeks Karyawan (merah = rawan, hijau = sehat)",
                   max_rows=30, figsize=(10, 8)):
-    """Heatmap responden (baris) x indeks (kolom), 0-100, tinggi = sehat."""
     comp = [c for c in INDEX_COMPONENTS.keys() if c in idx_df.columns]
     if not comp or idx_df.empty:
         return None
     cols = comp + (["Indeks Keseluruhan"] if "Indeks Keseluruhan" in idx_df.columns else [])
-    df = idx_df.sort_values("Indeks Keseluruhan" if "Indeks Keseluruhan" in idx_df.columns else cols[0])
-    df = df.head(max_rows)
+    sort_col = "Indeks Keseluruhan" if "Indeks Keseluruhan" in idx_df.columns else cols[0]
+    df = idx_df.sort_values(sort_col).head(max_rows)
     name_col = "full_name" if "full_name" in df.columns else None
     labels = [str(n)[:18] for n in df[name_col]] if name_col else [f"Resp {i+1}" for i in range(len(df))]
     data = df[cols].values.astype(float)
@@ -115,28 +116,25 @@ def index_heatmap(idx_df, title="Peta Indeks Karyawan (merah = rawan, hijau = se
             ax.text(j, i, f"{data[i,j]:.0f}", ha="center", va="center", fontsize=7.5)
     ax.set_title(title + (f" (tampil {len(df)} dari {len(idx_df)})" if len(idx_df) > max_rows else ""),
                  fontsize=11, fontweight="bold")
-    fig.colorbar(im, ax=ax, shrink=0.8, label="Indeks (0-100, tinggi = sehat)")
+    fig.colorbar(im, ax=ax, shrink=0.8, label="Indeks (0-100, " + SCALE_NOTE + ")")
     fig.tight_layout()
     return _to_png(fig)
 
 def band_distribution_chart(rows: list, title="Distribusi Kategori per Dimensi", figsize=(10, 7)):
-    """Stacked horizontal bar persentase kategori per dimensi.
-    Warna mengikuti makna: hijau = kondisi baik, kuning = waspada, merah = risiko."""
+    """Stacked bar persentase kategori - sudah skala sehat seragam (hijau selalu baik)."""
     if not rows:
         return None
     labels = [r["label"] for r in rows][::-1]
     lo_p = [r["low"] / r["n"] * 100 for r in rows][::-1]
     mid_p = [r["mid"] / r["n"] * 100 for r in rows][::-1]
     hi_p = [r["high"] / r["n"] * 100 for r in rows][::-1]
-    colors_lo = [("#2E8B57" if r["dir"] == "bad" else "#C0392B") for r in rows][::-1]
-    colors_hi = [("#C0392B" if r["dir"] == "bad" else "#2E8B57") for r in rows][::-1]
     y = np.arange(len(rows))
     fig, ax = plt.subplots(figsize=figsize)
-    ax.barh(y, lo_p, color=colors_lo, label="Kategori bawah", height=0.62)
-    ax.barh(y, mid_p, left=lo_p, color="#F2C14E", label="Kategori tengah", height=0.62)
+    ax.barh(y, lo_p, color="#C0392B", label="Rawan", height=0.62)
+    ax.barh(y, mid_p, left=lo_p, color="#F2C14E", label="Cukup", height=0.62)
     left2 = [a + b for a, b in zip(lo_p, mid_p)]
-    ax.barh(y, hi_p, left=left2, color=colors_hi, label="Kategori atas", height=0.62)
-    for i, r in enumerate(rows[::-1]):
+    ax.barh(y, hi_p, left=left2, color="#2E8B57", label="Baik", height=0.62)
+    for i in range(len(rows)):
         ax.text(lo_p[i]/2, y[i], f"{lo_p[i]:.0f}%", ha="center", va="center", fontsize=8,
                 color="white", fontweight="bold")
         ax.text(lo_p[i]+mid_p[i]/2, y[i], f"{mid_p[i]:.0f}%", ha="center", va="center", fontsize=8, color="#333")
@@ -145,9 +143,37 @@ def band_distribution_chart(rows: list, title="Distribusi Kategori per Dimensi",
                     fontsize=8, color="white", fontweight="bold")
     ax.set_yticks(y); ax.set_yticklabels(labels, fontsize=9)
     ax.set_xlim(0, 100); ax.set_xlabel("Persentase karyawan (%)")
-    ax.set_title(title + "\n(hijau selalu = kondisi baik, merah = perlu perhatian, mengikuti arah tiap tes)",
+    ax.set_title(title + "\n(skor tes yang arahnya terbalik sudah dibalik: hijau selalu = baik)",
                  fontsize=11, fontweight="bold")
-    ax.legend(fontsize=8, loc="lower right")
+    ax.legend(fontsize=9, loc="lower right")
+    ax.grid(axis="x", alpha=0.2)
+    fig.tight_layout()
+    return _to_png(fig)
+
+def action_map_chart(cats: dict, title="Peta Tindak Lanjut: Prioritas Pengembangan", figsize=(11, 7)):
+    """Batang skor sehat vs target sehat, diwarnai kategori tindak lanjut."""
+    order = ["konseling", "training", "pantau", "pertahankan"]
+    rows = [(r, cat) for cat in order for r in cats.get(cat, [])]
+    if not rows:
+        return None
+    rows.sort(key=lambda x: x[0]["gap"])  # paling tertinggal di atas
+    labels = [r["label"] + ("*" if r["dim"] in FLIP else "") for r, _ in rows][::-1]
+    vals = [(100 - r["mean"]) if r["dim"] in FLIP else r["mean"] for r, _ in rows][::-1]
+    tgts = [health_target(r["dim"]) for r, _ in rows][::-1]
+    colors = [ACTION_META[cat]["color"] for _, cat in rows][::-1]
+    y = np.arange(len(rows))
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.barh(y, vals, color=colors, alpha=0.9, height=0.62)
+    for yi, t in zip(y, tgts):
+        ax.plot([t, t], [yi-0.38, yi+0.38], color="black", linewidth=2, linestyle="--")
+    for yi, (r, cat), v in zip(y, rows[::-1], vals):
+        gap = abs(r["gap"])
+        ax.text(v + 1.5, yi, f"{v:.0f} (selisih {gap:.0f})", va="center", fontsize=8)
+    ax.set_yticks(y); ax.set_yticklabels(labels, fontsize=9)
+    ax.set_xlim(0, 112); ax.set_xlabel("Skor kesehatan (0-100, " + SCALE_NOTE + ")", fontsize=9)
+    ax.set_title(title + "\n(garis putus-putus = target; warna = kategori tindak lanjut)", fontsize=11, fontweight="bold")
+    handles = [plt.Rectangle((0, 0), 1, 1, color=ACTION_META[c]["color"]) for c in order]
+    ax.legend(handles, [ACTION_META[c]["label"] for c in order], fontsize=8, loc="lower right")
     ax.grid(axis="x", alpha=0.2)
     fig.tight_layout()
     return _to_png(fig)
