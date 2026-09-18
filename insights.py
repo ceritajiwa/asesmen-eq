@@ -61,9 +61,11 @@ INSIGHTS = {
 }
 
 def individual_insights(scores):
-    """-> list of (dim_label, band, teks_insight)"""
+    """-> list of (dim_label, band, teks_insight), hanya dimensi yang tersedia"""
     out = []
     for dim in DIM_ORDER:
+        if dim not in scores:
+            continue
         b = band(scores[dim])
         out.append((DIMS[dim]["label"], b, INSIGHTS[dim][b]))
     return out
@@ -72,6 +74,8 @@ def gap_analysis(mean_scores):
     """mean_scores: dict dim -> rata-rata 0-100 -> DataFrame-like list of rows + prioritas"""
     rows = []
     for dim in DIM_ORDER:
+        if dim not in mean_scores:
+            continue
         d = DIMS[dim]; val = mean_scores[dim]
         gap = (d["target"] - val) if d["dir"] == "bad" else (val - d["target"])
         status = "Melebihi target" if gap >= 0 else "Di bawah target"
