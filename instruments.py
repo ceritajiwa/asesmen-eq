@@ -135,3 +135,13 @@ MODULE_MAP = {
  "TIS":    "Modul Retensi & Stay Interview untuk HR/Leader",
  "PSQ":    "Modul 1: Psychological Safety Foundations",
 }
+
+# Label pendek untuk tampilan admin (pemilihan asesmen per training)
+INST_SHORT = {
+ "PSS":   "A. PSS-10 - Stres (10 item)",
+ "MBI":   "B. MBI-GS - Burnout (16 item)",
+ "WLEIS": "C. WLEIS - Kecerdasan Emosional (16 item)",
+ "UWES":  "D. UWES-9 - Work Engagement (9 item)",
+ "TIS":   "E. TIS-6 - Niat Keluar (6 item)",
+ "PSQ":   "F. PSQ-ORG - Psychological Safety (7 item)",
+}
