@@ -15,6 +15,7 @@ from hr_analytics import (clusterize, cluster_summary, band_counts_health, CLUST
 from charts import (radar_chart, bar_chart_targets, dept_chart, cluster_donut,
                     index_heatmap, band_distribution_chart, action_map_chart)
 from pdf_report import individual_pdf, company_pdf
+from questions import EXAM_QUESTIONS, SESSION_NAMES, PASSING_SCORE
 
 st.set_page_config(page_title="Asesmen EQ | Cerita Jiwa", page_icon="🧠", layout="wide")
 
@@ -55,7 +56,7 @@ def get_enabled(training):
 
 st.sidebar.title("🧠 Asesmen EQ")
 st.sidebar.caption("Cerita Jiwa Training Center")
-page = st.sidebar.radio("Menu", ["📝 Mulai Asesmen", "⬇️ Unduh Hasil Saya", "🔐 Admin"])
+page = st.sidebar.radio("Menu", ["📝 Mulai Asesmen", "🎓 Ujian Sertifikasi", "⬇️ Unduh Hasil Saya", "🔐 Admin"])
 st.sidebar.divider()
 
 HTAG = {"low": "🔴 perlu perhatian", "mid": "🟡 cukup", "high": "🟢 baik"}
@@ -217,6 +218,111 @@ elif page == "⬇️ Unduh Hasil Saya":
             else:
                 show_result(resp["full_name"], training["name"], resp.get("department"), resp.get("job_level"), scores)
 
+
+# ============================== PAGE: UJIAN ==============================
+elif page == "🎓 Ujian Sertifikasi":
+    st.title("🎓 Ujian Sertifikasi CERC")
+    st.caption(f"40 soal pilihan ganda (studi kasus) - nilai kelulusan {PASSING_SCORE} "
+               "(minimal 30 benar) - boleh mengulang sampai lulus.")
+
+    trainings = fetch_trainings()
+    if not trainings:
+        st.warning("Belum ada training terdaftar.")
+        st.stop()
+    tname = st.selectbox("Pilih Perusahaan / Training", [t["name"] for t in trainings], key="exam_t")
+    training = next(t for t in trainings if t["name"] == tname)
+
+    if training.get("access_code") and st.session_state.get("exam_ok") != training["id"]:
+        code = st.text_input("Kode akses", type="password", key="exam_code")
+        cbtn, _ = st.columns([1, 3])
+        if cbtn.button("🔓 Masuk ke Ujian", type="primary", use_container_width=True):
+            if code == training["access_code"]:
+                st.session_state["exam_ok"] = training["id"]
+                st.rerun()
+            else:
+                st.error("Kode akses salah.")
+        st.stop()
+
+    # ---- tampilkan hasil bila sudah ujian ----
+    if "exam_result" in st.session_state:
+        r = st.session_state["exam_result"]
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Nilai", f"{r['score']}")
+        c2.metric("Benar", f"{r['correct']} / 40")
+        c3.metric("Status", "LULUS ✅" if r["passed"] else "BELUM LULUS ❌")
+        if r["passed"]:
+            st.success(f"Selamat, **{r['name']}**! Anda dinyatakan LULUS Ujian Sertifikasi CERC.")
+            st.balloons()
+        else:
+            st.error(f"Nilai Anda {r['score']} - belum mencapai {PASSING_SCORE}. "
+                     "Pelajari kembali materi, lalu ulangi ujian. Boleh mengulang tanpa batas.")
+        st.divider()
+        st.subheader("📋 Review Jawaban")
+        for q in EXAM_QUESTIONS:
+            ua = r["answers"].get(q["n"])
+            ok = ua == q["key"]
+            label = f"{'✅' if ok else '❌'} Soal {q['n']} - {'Benar' if ok else 'Salah'}"
+            with st.expander(label):
+                st.markdown(f"**{q['q']}**")
+                for i, opt in enumerate(q["opts"]):
+                    mark = ""
+                    if i == q["key"]:
+                        mark = "  ✅ **(kunci)**"
+                    if ua is not None and i == ua and not ok:
+                        mark = "  ❌ **(jawaban Anda)**"
+                    st.markdown(f"- {chr(65+i)}. {opt}{mark}")
+        st.divider()
+        cc1, cc2 = st.columns(2)
+        if cc1.button("🔁 Ulangi Ujian", type="primary", use_container_width=True):
+            del st.session_state["exam_result"]
+            st.rerun()
+        if cc2.button("Selesai", use_container_width=True):
+            del st.session_state["exam_result"]
+            st.info("Terima kasih. Sertifikat fisik/digital akan diberikan oleh trainer Anda.")
+        st.stop()
+
+    # ---- biodata ----
+    st.divider()
+    st.subheader("Data Peserta Ujian")
+    c1, c2 = st.columns(2)
+    name = c1.text_input("Nama lengkap", key="exam_name")
+    email = c2.text_input("Email", key="exam_email")
+    if not name.strip() or not email.strip():
+        st.warning("Lengkapi nama dan email untuk mulai ujian.")
+        st.stop()
+
+    # ---- soal ----
+    st.divider()
+    st.subheader("Soal Ujian")
+    answers = {}
+    for s in [1, 2, 3, 4]:
+        with st.expander(f"**{SESSION_NAMES[s]}** (Soal {(s-1)*10+1}-{s*10})", expanded=(s == 1)):
+            for q in [x for x in EXAM_QUESTIONS if x["session"] == s]:
+                opts = [f"{chr(65+i)}. {o}" for i, o in enumerate(q["opts"])]
+                val = st.radio(f"**{q['n']}.** {q['q']}", opts, key=f"exam_q{q['n']}", index=None)
+                if val is not None:
+                    answers[q["n"]] = ord(val[0]) - 65
+    answered = len(answers)
+    st.progress(answered / 40, text=f"Terjawab: {answered}/40")
+    if st.button("✅ Kumpulkan Jawaban", type="primary", use_container_width=True):
+        if answered < 40:
+            st.error(f"Masih ada {40 - answered} soal belum dijawab.")
+        else:
+            correct = sum(1 for q in EXAM_QUESTIONS if answers.get(q["n"]) == q["key"])
+            score = round(correct / 40 * 100)
+            passed = score >= PASSING_SCORE
+            try:
+                sb.table("exam_attempts").insert(dict(
+                    training_id=training["id"], full_name=name.strip(),
+                    email=email.strip().lower(), correct=correct,
+                    score=score, passed=passed)).execute()
+            except Exception:
+                pass  # tabel belum ada pun ujian tetap jalan
+            st.session_state["exam_result"] = dict(
+                name=name.strip(), answers=answers, correct=correct,
+                score=score, passed=passed)
+            st.rerun()
+
 # ============================== PAGE: ADMIN ==============================
 else:
     st.title("🔐 Area Admin")
@@ -230,7 +336,7 @@ else:
                 st.error("Password salah.")
         st.stop()
 
-    tab1, tab2, tab3, tab4 = st.tabs(["📊 Report per Perusahaan", "👤 Report per Individu", "🏢 Kelola Training", "🧪 Data Dummy"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 Report per Perusahaan", "👤 Report per Individu", "🏢 Kelola Training", "🧪 Data Dummy", "🎓 Riwayat Ujian"])
 
     # ---------- TAB 1 ----------
     with tab1:
@@ -491,6 +597,36 @@ else:
                 sb.table("trainings").delete().eq("id", tid).execute()
                 st.success("Training dihapus.")
                 st.rerun()
+
+    # ---------- TAB 5 ----------
+    with tab5:
+        st.subheader("🎓 Riwayat Ujian Sertifikasi")
+        trainings = fetch_trainings()
+        if not trainings:
+            st.info("Belum ada training.")
+        else:
+            tname = st.selectbox("Perusahaan / Training", [t["name"] for t in trainings], key="exam_hist_t")
+            training = next(t for t in trainings if t["name"] == tname)
+            try:
+                att = sb.table("exam_attempts").select("*").eq("training_id", training["id"]).order("created_at", desc=True).execute().data or []
+            except Exception:
+                att = []
+            if not att:
+                st.info("Belum ada percobaan ujian untuk training ini. "
+                        "(Kalau baru deploy, jalankan migrasi SQL untuk tabel exam_attempts dulu.)")
+            else:
+                lulus = sum(1 for a in att if a["passed"])
+                c1, c2, c3 = st.columns(3)
+                c1.metric("Total Percobaan", len(att))
+                c2.metric("Lulus", lulus)
+                c3.metric("Belum Lulus", len(att) - lulus)
+                df_att = pd.DataFrame(att)[["full_name", "email", "correct", "score", "passed", "created_at"]]
+                df_att.columns = ["Nama", "Email", "Benar", "Nilai", "Lulus", "Waktu"]
+                df_att["Lulus"] = df_att["Lulus"].map({True: "✅ Lulus", False: "❌ Belum"})
+                st.dataframe(df_att, hide_index=True, use_container_width=True)
+                st.download_button("⬇️ CSV Riwayat Ujian", df_att.to_csv(index=False).encode(),
+                                   file_name=f"Riwayat_Ujian_{tname}.csv", mime="text/csv")
+
         st.divider()
         if st.button("🚪 Keluar dari mode admin"):
             del st.session_state["admin_ok"]
