@@ -1,6 +1,6 @@
 
 # -*- coding: utf-8 -*-
-import io, json, random
+import io, json, random, zipfile
 import streamlit as st
 import pandas as pd
 from supabase import create_client
@@ -91,6 +91,26 @@ def show_result(name, training_name, dept, job_level, scores):
         for label, b, text in rows:
             st.markdown(f"- **{label}** — {text}")
         st.write("")
+
+
+def build_zip_all(training_name, df_scores, cols, comp_pdf_bytes):
+    """ZIP berisi PDF agregat + semua PDF individual. df_scores sudah ter-merge dgn nama/dept."""
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr(f"Report_Agregat_{training_name.replace(' ','_')}.pdf", comp_pdf_bytes)
+        n = 0
+        for _, row in df_scores.iterrows():
+            scores = {d: float(row[d]) for d in cols if pd.notna(row[d])}
+            if not scores:
+                continue
+            groups = grouped_insights(scores)
+            png = radar_chart(scores, f"Profil {row['full_name']}")
+            pdf_b = individual_pdf(row["full_name"], training_name,
+                                   row.get("department"), row.get("job_level"),
+                                   scores, groups, png)
+            z.writestr(f"Individu/{row['full_name'].replace(' ','_')}.pdf", pdf_b)
+            n += 1
+    return buf.getvalue(), n
 
 # ============================== PAGE: ASESmen ==============================
 if page == "📝 Mulai Asesmen":
@@ -321,17 +341,38 @@ else:
                                 dim = next(d for d in DIM_ORDER if DIMS[d]["label"] == label)
                                 trows.append((label, mean_scores[dim], DIMS[dim]["dir"], DIRECTION_NOTE[DIMS[dim]["dir"]]))
                             grouped.append((key, title, plain, trows))
+                        cluster_members = {}
+                        for cid in [1, 2, 3, 4]:
+                            sub = idx_df[idx_df["cluster"] == cid]
+                            cluster_members[cid] = [
+                                (r["full_name"], r.get("department"),
+                                 r.get("Indeks Keseluruhan"), r.get("area_rawan"))
+                                for _, r in sub.iterrows()]
                         bundle = dict(
                             training_name=tname, n_respondents=len(df_scores),
                             radar_png=radar_png, donut_png=donut_png, heat_png=heat_png, band_png=band_png,
                             grouped=grouped, gap_rows=gap_rows,
                             strengths=strengths, concerns=concerns, recommendations=recs,
-                            cluster_summary=csum, closing=closing_paragraph(len(concerns)))
+                            cluster_summary=csum, cluster_members=cluster_members,
+                            closing=closing_paragraph(len(concerns)))
                         comp_pdf = company_pdf(bundle)
                         ec2.download_button("⬇️ PDF Report Perusahaan", comp_pdf,
                                             file_name=f"Report_Agregat_{tname}.pdf", mime="application/pdf")
                         ec3.download_button("⬇️ CSV Skor Individu", df_scores.to_csv(index=False).encode(),
                                             file_name=f"Skor_{tname}.csv", mime="text/csv")
+                        st.write("")
+                        if st.button(f"📦 Buat ZIP Lengkap (agregat + {len(df_scores)} PDF individu)", type="primary"):
+                            with st.spinner("Membuat PDF untuk setiap peserta... (1-2 menit untuk banyak peserta)"):
+                                try:
+                                    zip_bytes, n_pdf = build_zip_all(tname, df_scores, cols, comp_pdf)
+                                    st.session_state["zip_ready"] = (zip_bytes, n_pdf)
+                                except Exception as ex:
+                                    st.error(f"Gagal membuat ZIP: {ex}")
+                        if "zip_ready" in st.session_state:
+                            zip_bytes, n_pdf = st.session_state.pop("zip_ready")
+                            st.download_button(f"⬇️ Download ZIP ({n_pdf + 1} file PDF)", data=zip_bytes,
+                                               file_name=f"Report_Lengkap_{tname.replace(' ','_')}.zip",
+                                               mime="application/zip")
                 else:
                     st.info("Belum ada jawaban yang masuk.")
 
