@@ -4,8 +4,8 @@ import io
 from datetime import datetime
 from fpdf import FPDF
 from instruments import DIMS, DIM_ORDER
-from insights import band, BAND_LABEL, DIRECTION_NOTE, CONSEQUENCE, closing_paragraph
-from hr_analytics import CLUSTERS
+from insights import band, BAND_LABEL, CAPTIONS, FOLLOWUP, closing_paragraph
+from hr_analytics import CLUSTERS, ACTION_META, FLIP
 
 class BasePDF(FPDF):
     def header(self):
@@ -34,16 +34,22 @@ def _img(pdf, png_bytes, **kw):
     except OSError: pass
 
 def _safe(s):
-    return (str(s).replace("\u2019", "'").replace("\u2018", "'")
-            .replace("\u201c", '"').replace("\u201d", '"')
-            .replace("\u2013", "-").replace("\u2014", "-"))
+    return (str(s).replace("'", "'").replace("'", "'")
+            .replace(""", '"').replace(""", '"')
+            .replace("–", "-").replace("—", "-"))
 
 def _mc(pdf, text, h=5.5, size=None, style=""):
     if size: pdf.set_font("helvetica", style, size)
     try:
         pdf.multi_cell(0, h, _safe(text), new_x="LMARGIN", new_y="NEXT")
-    except TypeError:  # fpdf versi lama
+    except TypeError:
         pdf.multi_cell(0, h, _safe(text))
+
+def _cap(pdf, text):
+    pdf.set_font("helvetica", "I", 8.5)
+    pdf.set_text_color(110, 110, 110)
+    _mc(pdf, text, h=4.5)
+    pdf.set_text_color(30, 30, 30)
 
 def _finish(pdf):
     res = pdf.output()
@@ -53,13 +59,16 @@ def _need_space(pdf, threshold=250):
     if pdf.get_y() > threshold:
         pdf.add_page("L")
 
+def _hex(h):
+    h = h.lstrip("#")
+    return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
+
 # ============================== PDF INDIVIDUAL ==============================
 def individual_pdf(name, training_name, dept, job_level, scores, grouped, radar_png):
     pdf = BasePDF()
     pdf.company = training_name
     pdf.add_page()
     pdf.set_text_color(30, 30, 30)
-
     pdf.set_font("helvetica", "B", 16)
     pdf.cell(0, 10, "Laporan Hasil Asesmen EQ", ln=1, align="C")
     pdf.ln(2)
@@ -71,13 +80,9 @@ def individual_pdf(name, training_name, dept, job_level, scores, grouped, radar_
         pdf.set_font("helvetica", "", 10); pdf.cell(0, 6, _safe(str(v)), ln=1)
     pdf.ln(2)
     _img(pdf, radar_png, x=58, w=95)
+    pdf.ln(1)
+    _cap(pdf, CAPTIONS["radar"])
     pdf.ln(2)
-    _mc(pdf, "Cara membaca: skor dinormalisasi 0-100. Pada tes stres, burnout (kelelahan & sinisme), "
-             "dan kecenderungan keluar, skor RENDAH justru menandakan kondisi baik. Pada tes lainnya, "
-             "skor TINGGI menandakan kondisi baik. Setiap bagian di bawah sudah menyesuaikan arahnya masing-masing.",
-         h=5, size=9, style="I")
-    pdf.ln(3)
-
     for key, title, plain, rows in grouped:
         _need_space(pdf, 250)
         pdf.set_font("helvetica", "B", 12)
@@ -90,58 +95,56 @@ def individual_pdf(name, training_name, dept, job_level, scores, grouped, radar_
         pdf.set_font("helvetica", "B", 9)
         pdf.cell(80, 7, "Aspek", border=1, fill=True)
         pdf.cell(22, 7, "Skor", border=1, fill=True, align="C")
-        pdf.cell(32, 7, "Kategori", border=1, fill=True, align="C")
         pdf.cell(56, 7, "Catatan", border=1, fill=True, ln=1)
         pdf.set_font("helvetica", "", 9)
         for label, b, text in rows:
             dim = next(d for d in DIM_ORDER if DIMS[d]["label"] == label)
-            note = "makin rendah makin baik" if DIMS[dim]["dir"] == "bad" else "makin tinggi makin baik"
+            note = "* skor dibalik" if dim in FLIP else "-"
             pdf.cell(80, 6.5, _safe(label), border=1)
             pdf.cell(22, 6.5, f"{scores[dim]:.0f}", border=1, align="C")
-            pdf.cell(32, 6.5, BAND_LABEL[b], border=1, align="C")
             pdf.cell(56, 6.5, _safe(note), border=1, ln=1)
         pdf.ln(1)
         for label, b, text in rows:
             _mc(pdf, f"- {label}: {text}", h=5, size=9.5)
         pdf.ln(4)
-
     pdf.set_font("helvetica", "I", 8.5)
     pdf.set_text_color(120, 120, 120)
-    _mc(pdf, "Catatan: hasil asesmen bersifat rahasia dan digunakan untuk pengembangan kapasitas emosional. "
-             "Skor adalah potret satu momen dan dapat berubah seiring dukungan serta kebiasaan kerja.",
-        h=5)
+    _mc(pdf, "Catatan: hasil asesmen bersifat rahasia dan untuk pengembangan. Skor adalah potret satu momen "
+             "dan dapat berubah. Tanda * berarti skor tes tersebut dibalik agar searah dengan tes lain "
+             "(makin tinggi = makin sehat) - bacanya tetap pada penjelasan tiap aspek.", h=5)
     return _finish(pdf)
 
 # ============================== PDF PERUSAHAAN ==============================
 def company_pdf(bundle):
-    """bundle: dict berisi semua komponen report perusahaan."""
     b = bundle
     pdf = BasePDF("L")
     pdf.company = b["training_name"]
     pdf.add_page("L")
     pdf.set_text_color(30, 30, 30)
-
     pdf.set_font("helvetica", "", 11)
     pdf.set_text_color(120, 120, 120)
-    pdf.cell(0, 6, "Laporan Agregat Asesmen EQ & Kondisi Psikologis Karyawan", align="C", ln=1)
+    pdf.cell(0, 6, "Laporan Agregat Kondisi Psikologis Karyawan", align="C", ln=1)
     pdf.set_font("helvetica", "B", 20)
     pdf.set_text_color(91, 78, 158)
     pdf.cell(0, 12, _safe(b["training_name"]), align="C", ln=1)
-    pdf.set_text_color(30, 30, 30)
     pdf.set_font("helvetica", "", 10)
+    pdf.set_text_color(30, 30, 30)
     pdf.cell(0, 7, f"Jumlah responden: {b['n_respondents']}  |  Dicetak: {datetime.now().strftime('%d %B %Y')}",
              align="C", ln=1)
     pdf.ln(2)
+    if b.get("opening"):
+        _mc(pdf, b["opening"], h=5.5, size=10)
+        pdf.ln(2)
     _img(pdf, b["radar_png"], x=15, y=pdf.get_y(), w=105)
     if b.get("donut_png"):
         _img(pdf, b["donut_png"], x=150, y=pdf.get_y(), w=125)
     pdf.ln(88)
-    _mc(pdf, "Cara membaca: skor dinormalisasi 0-100 dengan arah yang berbeda per tes. Tes stres, burnout "
-             "(kelelahan & sinisme), dan kecenderungan keluar: skor rendah = baik. Tes lainnya: skor tinggi = baik. "
-             "Setiap bagian di bawah ini sudah menyesuaikan arah tesnya masing-masing.", h=5, size=9, style="I")
+    _cap(pdf, "Gambar 1 (kiri): " + CAPTIONS["radar"])
+    if b.get("donut_png"):
+        _cap(pdf, "Gambar 2 (kanan): " + CAPTIONS["donut"])
     pdf.ln(3)
 
-    # ---- Bagian 1: hasil per tes (dikelompokkan) ----
+    # ---- Bagian 1: hasil per tes ----
     pdf.set_font("helvetica", "B", 14)
     pdf.set_text_color(91, 78, 158)
     pdf.cell(0, 9, "1. Hasil per Tes", ln=1)
@@ -159,9 +162,9 @@ def company_pdf(bundle):
         pdf.cell(95, 7, "Aspek", border=1, fill=True)
         pdf.cell(28, 7, "Rata-rata", border=1, fill=True, align="C")
         pdf.cell(38, 7, "Kategori", border=1, fill=True, align="C")
-        pdf.cell(110, 7, "Arah tes", border=1, fill=True, ln=1)
+        pdf.cell(110, 7, "Keterangan", border=1, fill=True, ln=1)
         pdf.set_font("helvetica", "", 9)
-        for label, mean, dir_, note in rows:
+        for label, mean, raw_mean, dir_, note in rows:
             pdf.cell(95, 6.5, _safe(label), border=1)
             pdf.cell(28, 6.5, f"{mean:.0f}", border=1, align="C")
             pdf.cell(38, 6.5, BAND_LABEL[band(mean)], border=1, align="C")
@@ -174,11 +177,11 @@ def company_pdf(bundle):
     pdf.set_text_color(91, 78, 158)
     pdf.cell(0, 9, "2. Distribusi Kategori Karyawan per Dimensi", ln=1)
     pdf.set_text_color(30, 30, 30)
-    _mc(pdf, "Grafik ini menunjukkan pembagian karyawan di tiap kategori. Warna hijau SELALU berarti kondisi "
-             "baik dan merah berarti perlu perhatian - sudah dikoreksi mengikuti arah tiap tes.", h=5, size=9.5)
     if b.get("band_png"):
-        _img(pdf, b["band_png"], x=40, w=200)
-    pdf.ln(4)
+        _img(pdf, b["band_png"], x=40, y=pdf.get_y(), w=200)
+        pdf.ln(105)
+    _cap(pdf, "Gambar 3: " + CAPTIONS["band"])
+    pdf.ln(3)
 
     # ---- Bagian 3: klasterisasi ----
     _need_space(pdf, 150)
@@ -186,12 +189,11 @@ def company_pdf(bundle):
     pdf.set_text_color(91, 78, 158)
     pdf.cell(0, 9, "3. Klasterisasi Profil Karyawan", ln=1)
     pdf.set_text_color(30, 30, 30)
-    _mc(pdf, "Setiap karyawan dikelompokkan berdasarkan jumlah aspek yang menunjukkan sinyal rawan "
-             "(indeks di bawah 50). Indeks diarahkan seragam: semakin tinggi semakin sehat.", h=5, size=9.5)
-    pdf.ln(1)
     if b.get("heat_png"):
-        _img(pdf, b["heat_png"], x=60, w=170)
-        pdf.ln(2)
+        _img(pdf, b["heat_png"], x=60, y=pdf.get_y(), w=170)
+        pdf.ln(120)
+    _cap(pdf, "Gambar 4: " + CAPTIONS["heat"])
+    pdf.ln(2)
     for c in b["cluster_summary"]:
         _need_space(pdf, 200)
         pdf.set_font("helvetica", "B", 10.5)
@@ -222,35 +224,53 @@ def company_pdf(bundle):
                 _mc(pdf, f"... dan {len(members)-15} karyawan lainnya (lihat sheet Klasterisasi di file Excel).", h=5)
         pdf.ln(2)
 
-    # ---- Bagian 4: analisis kebutuhan (soft selling) ----
+    # ---- Bagian 4: risiko ----
     pdf.add_page("L")
     pdf.set_font("helvetica", "B", 14)
     pdf.set_text_color(91, 78, 158)
-    pdf.cell(0, 9, "4. Analisis Kebutuhan & Rekomendasi Pengembangan", ln=1)
+    pdf.cell(0, 9, "4. Risiko yang Perlu Diwaspadai", ln=1)
     pdf.set_text_color(30, 30, 30)
+    _mc(pdf, "Bagian ini menerjemahkan angka menjadi konsekuensi bisnis. Setiap risiko di bawah bersifat "
+             "preventif - artinya masih ada waktu untuk bertindah sebelum berubah menjadi biaya nyata.",
+        h=5.5, size=9.5)
+    pdf.ln(1)
+    for s in b.get("risks", []):
+        _mc(pdf, s, h=5.5, size=9.5)
+        pdf.ln(1)
 
-    pdf.set_font("helvetica", "B", 11)
-    _mc(pdf, "Yang sudah baik", h=6)
-    pdf.set_font("helvetica", "", 9.5)
-    if b["strengths"]:
-        for r in b["strengths"]:
-            _mc(pdf, f"- {r['label']} (rata-rata {r['mean']:.0f}/100): berada pada atau di atas level sehat.", h=5.5)
-    else:
-        _mc(pdf, "- Belum ada aspek yang mencapai level sehat. Ini bukan vonis - melainkan titik awal yang jelas untuk memulai.", h=5.5)
+    # ---- Bagian 5: peta tindak lanjut ----
+    pdf.add_page("L")
+    pdf.set_font("helvetica", "B", 14)
+    pdf.set_text_color(91, 78, 158)
+    pdf.cell(0, 9, "5. Peta Tindak Lanjut & Rekomendasi Pengembangan", ln=1)
+    pdf.set_text_color(30, 30, 30)
+    if b.get("action_png"):
+        _img(pdf, b["action_png"], x=25, y=pdf.get_y(), w=230)
+        pdf.ln(120)
+    _cap(pdf, "Gambar 5: " + CAPTIONS["action"])
     pdf.ln(2)
-
-    if b["concerns"]:
-        pdf.set_font("helvetica", "B", 11)
-        _mc(pdf, "Yang perlu diperhatikan", h=6)
-        pdf.set_font("helvetica", "", 9.5)
-        for r in b["concerns"]:
-            _mc(pdf, f"- {r['label']} (rata-rata {r['mean']:.0f}/100; target "
-                     f"{'maksimal' if r['dir']=='bad' else 'minimal'} {r['target']}): {CONSEQUENCE[r['dim']]}",
-                h=5.5)
+    cats = b.get("action_cats") or {}
+    for cat in ["konseling", "training", "pantau", "pertahankan"]:
+        rows = cats.get(cat) or []
+        if not rows:
+            continue
+        _need_space(pdf, 200)
+        pdf.set_font("helvetica", "B", 10.5)
+        pdf.set_text_color(*_hex(ACTION_META[cat]["color"]))
+        pdf.cell(0, 6.5, _safe(f"{ACTION_META[cat]['label']} ({len(rows)} aspek)"), ln=1)
+        pdf.set_text_color(30, 30, 30)
+        _mc(pdf, ACTION_META[cat]["desc"], h=5, size=9)
+        pdf.ln(1)
+        for r in rows:
+            fu = FOLLOWUP.get(r["dim"], "")
+            line = f"- {r['label']} (selisih {abs(r['gap']):.0f} poin dari target). Program yang relevan: {r['rekomendasi']}."
+            if cat in ("konseling", "training") and fu:
+                line += f" Asesmen lanjutan yang disarankan: {fu}"
+            _mc(pdf, line, h=5, size=9)
         pdf.ln(2)
 
     pdf.set_font("helvetica", "B", 11)
-    _mc(pdf, "Kebutuhan pengembangan yang disarankan", h=6)
+    _mc(pdf, "Penutup", h=6)
     pdf.set_font("helvetica", "", 9.5)
     for s in b["recommendations"]:
         _mc(pdf, s.lstrip("- "), h=5.5)
@@ -258,7 +278,3 @@ def company_pdf(bundle):
     pdf.set_font("helvetica", "I", 9)
     _mc(pdf, b["closing"], h=5)
     return _finish(pdf)
-
-def _hex(h):
-    h = h.lstrip("#")
-    return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
