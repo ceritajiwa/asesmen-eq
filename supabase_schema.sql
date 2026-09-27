@@ -49,3 +49,15 @@ create table if not exists public.exam_attempts (
   created_at timestamptz not null default now()
 );
 create index if not exists idx_exam_training on public.exam_attempts(training_id);
+
+-- ===== Tabel sesi konseling BEI (jalankan SEKALI) =====
+create table if not exists public.bei_sessions (
+  id bigint generated always as identity primary key,
+  training_id uuid not null references public.trainings(id) on delete cascade,
+  participant_name text not null,
+  counselor_name text not null,
+  narratives jsonb,
+  structured jsonb,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_bei_training on public.bei_sessions(training_id);

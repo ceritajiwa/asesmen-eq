@@ -16,6 +16,7 @@ from charts import (radar_chart, bar_chart_targets, dept_chart, cluster_donut,
                     index_heatmap, band_distribution_chart, action_map_chart)
 from pdf_report import individual_pdf, company_pdf
 from questions import EXAM_QUESTIONS, SESSION_NAMES, PASSING_SCORE
+from bei import (BEI_PROMPTS, STRUCT_FIELDS, structure_bei, bei_participant_pdf, bei_company_pdf, fetch_bei)
 
 st.set_page_config(page_title="Asesmen EQ | Cerita Jiwa", page_icon="🧠", layout="wide")
 
@@ -56,7 +57,7 @@ def get_enabled(training):
 
 st.sidebar.title("🧠 Asesmen EQ")
 st.sidebar.caption("Cerita Jiwa Training Center")
-page = st.sidebar.radio("Menu", ["📝 Mulai Asesmen", "🎓 Ujian Sertifikasi", "⬇️ Unduh Hasil Saya", "🔐 Admin"])
+page = st.sidebar.radio("Menu", ["📝 Mulai Asesmen", "🎓 Ujian Sertifikasi", "⬇️ Unduh Hasil Saya", "👨‍⚕️ Menu Trainer (BEI)", "🔐 Admin"])
 st.sidebar.divider()
 
 HTAG = {"low": "🔴 perlu perhatian", "mid": "🟡 cukup", "high": "🟢 baik"}
@@ -165,11 +166,20 @@ if page == "📝 Mulai Asesmen":
         with st.expander(f"**{inst['name']}** ({len(inst['items'])} pernyataan)", expanded=(idx == 0)):
             st.caption(inst["intro"])
             for it in inst["items"]:
-                opts = [s[1] for s in inst["scale"]]
-                val = st.radio(f"**{it['n']}.** {it['text']}", opts, key=f"{inst['key']}_{it['n']}", index=None)
-                if val is not None:
-                    val_map = {lbl: num for num, lbl in inst["scale"]}
-                    answers[(inst["key"], it["n"])] = val_map[val]
+                if inst.get("mcq"):
+                    if it.get("img"):
+                        st.image(it["img"], width=520)
+                        val = st.radio(f"**{it['n']}.** Jawaban:", it["opts"], key=f"{inst['key']}_{it['n']}", index=None)
+                    else:
+                        val = st.radio(f"**{it['n']}.** {it['text']}", it["opts"], key=f"{inst['key']}_{it['n']}", index=None)
+                    if val is not None:
+                        answers[(inst["key"], it["n"])] = it["opts"].index(val)
+                else:
+                    opts = [s[1] for s in inst["scale"]]
+                    val = st.radio(f"**{it['n']}.** {it['text']}", opts, key=f"{inst['key']}_{it['n']}", index=None)
+                    if val is not None:
+                        val_map = {lbl: num for num, lbl in inst["scale"]}
+                        answers[(inst["key"], it["n"])] = val_map[val]
 
     st.divider()
     answered = len(answers)
@@ -322,6 +332,77 @@ elif page == "🎓 Ujian Sertifikasi":
                 name=name.strip(), answers=answers, correct=correct,
                 score=score, passed=passed)
             st.rerun()
+
+
+# ============================== PAGE: TRAINER BEI ==============================
+elif page == "👨‍⚕️ Menu Trainer (BEI)":
+    st.title("👨‍⚕️ Menu Trainer - Catatan Sesi Konseling (BEI)")
+    st.caption("Isi narasi sesi sesuai panduan pertanyaan. AI akan menyusun hasil dalam bentuk tabel "
+               "terstruktur untuk peserta dan perusahaan.")
+    if "trainer_ok" not in st.session_state:
+        pwd = st.text_input("Password trainer", type="password")
+        if st.button("Masuk"):
+            if pwd == st.secrets.get("TRAINER_PASSWORD", st.secrets["ADMIN_PASSWORD"]):
+                st.session_state["trainer_ok"] = True
+                st.rerun()
+            else:
+                st.error("Password salah.")
+        st.stop()
+
+    trainings = fetch_trainings()
+    if not trainings:
+        st.warning("Belum ada training terdaftar.")
+        st.stop()
+    tname = st.selectbox("Perusahaan / Training", [t["name"] for t in trainings], key="bei_t")
+    training = next(t for t in trainings if t["name"] == tname)
+    resps = fetch_respondents(training["id"])
+
+    c1, c2 = st.columns(2)
+    existing = c1.selectbox("Pilih peserta (yang sudah pernah asesmen)", ["-- peserta baru --"] + [r["full_name"] for r in resps])
+    if existing == "-- peserta baru --":
+        p_name = c2.text_input("Nama peserta")
+    else:
+        p_name = existing
+    counselor = st.text_input("Nama konselor / trainer")
+
+    st.divider()
+    st.subheader("Panduan Pertanyaan Sesi")
+    narratives = {}
+    for key, title, hint in BEI_PROMPTS:
+        with st.expander(f"**{title}**"):
+            st.caption(hint)
+            narratives[key] = st.text_area("Catatan", key=f"bei_{key}", height=110, label_visibility="collapsed")
+
+    if st.button("💾 Simpan & Proses dengan AI", type="primary", use_container_width=True):
+        if not p_name.strip() or not counselor.strip():
+            st.error("Nama peserta dan konselor wajib diisi.")
+        elif not any(str(v).strip() for v in narratives.values()):
+            st.error("Isi minimal salah satu bagian narasi.")
+        else:
+            with st.spinner("Menyimpan dan memproses dengan AI..."):
+                api_key = st.secrets.get("GEMINI_API_KEY", None)
+                structured = structure_bei(narratives, api_key)
+                sb.table("bei_sessions").insert(dict(
+                    training_id=training["id"], participant_name=p_name.strip(),
+                    counselor_name=counselor.strip(),
+                    narratives=json.dumps(narratives, ensure_ascii=False),
+                    structured=json.dumps(structured, ensure_ascii=False) if structured else None)).execute()
+            st.success("Sesi tersimpan.")
+            st.session_state["bei_last"] = (p_name.strip(), dict(narratives), structured)
+            st.rerun()
+
+    if "bei_last" in st.session_state:
+        ln, lnar, lstc = st.session_state.pop("bei_last")
+        st.divider()
+        st.subheader(f"📋 Hasil Terstruktur - {ln}")
+        if lstc:
+            st.dataframe(_struct_table(lstc), hide_index=True, use_container_width=True)
+        else:
+            st.info("Struktur AI kosong (GEMINI_API_KEY belum diisi di Secrets, atau proses gagal). "
+                    "Narasi tetap tersimpan; isi GEMINI_API_KEY lalu sesi berikutnya akan diproses.")
+        pdf_b = bei_participant_pdf(tname, ln, counselor, lnar, lstc)
+        st.download_button("⬇️ Download PDF Sesi Ini", data=pdf_b,
+                           file_name=f"BEI_{ln.replace(' ','_')}.pdf", mime="application/pdf")
 
 # ============================== PAGE: ADMIN ==============================
 else:
@@ -516,6 +597,26 @@ else:
                                     st.session_state["zip_ready"] = (zip_bytes, n_pdf)
                                 except Exception as ex:
                                     st.error(f"Gagal membuat ZIP: {ex}")
+                        st.write("")
+                        bei_sessions = fetch_bei(sb, training["id"])
+                        if bei_sessions:
+                            bei_pdf = bei_company_pdf(tname, bei_sessions)
+                            st.download_button(f"⬇️ PDF Report BEI ({len(bei_sessions)} sesi konseling)",
+                                               data=bei_pdf, file_name=f"Report_BEI_{tname.replace(' ','_')}.pdf",
+                                               mime="application/pdf")
+                            with st.expander("Lihat & download PDF per peserta (BEI)"):
+                                for s in bei_sessions:
+                                    nar = json.loads(s.get("narratives") or "{}")
+                                    stc = json.loads(s["structured"]) if s.get("structured") else None
+                                    pdf_p = bei_participant_pdf(tname, s["participant_name"],
+                                                                s.get("counselor_name", "-"), nar, stc)
+                                    st.download_button(f"⬇️ {s['participant_name']} ({str(s.get('created_at',''))[:10]})",
+                                                       data=pdf_p,
+                                                       file_name=f"BEI_{s['participant_name'].replace(' ','_')}.pdf",
+                                                       mime="application/pdf", key=f"beipdf_{s['id']}")
+                        else:
+                            st.caption("Belum ada data sesi konseling (BEI) untuk perusahaan ini. "
+                                       "Report BEI akan tersedia setelah trainer mencatat sesi di Menu Trainer.")
                         if "zip_ready" in st.session_state:
                             zip_bytes, n_pdf = st.session_state.pop("zip_ready")
                             st.download_button(f"⬇️ Download ZIP ({n_pdf + 1} file PDF)", data=zip_bytes,

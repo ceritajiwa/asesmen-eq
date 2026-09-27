@@ -15,6 +15,18 @@ def compute_dim_scores(answers, instruments=None):
     instruments = instruments if instruments is not None else INSTRUMENTS
     out = {}
     for inst in instruments:
+        if inst.get("mcq"):  # pilihan ganda berkunci (screening kognitif)
+            n_correct, complete = 0, True
+            for it in inst["items"]:
+                k = (inst["key"], it["n"])
+                if k not in answers:
+                    complete = False
+                    break
+                if answers[k] == it["key"]:
+                    n_correct += 1
+            if complete:
+                out[inst["items"][0]["dim"]] = round(n_correct / len(inst["items"]) * 100, 1)
+            continue
         vals = []
         for it in inst["items"]:
             k = (inst["key"], it["n"])

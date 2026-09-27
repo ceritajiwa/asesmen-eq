@@ -16,6 +16,13 @@ INDEX_COMPONENTS = {
     "Keterlibatan Kerja":   [("VIG", 1), ("DED", 1), ("ABS", 1)],
     "Retensi":              [("TIS", -1)],
     "Aman Psikologis":      [("PSQ", 1)],
+    "Kontrol Diri":         [("SELFCTRL", 1)],
+    "Resiliensi":           [("RESIL", 1)],
+    "Kep. Diri":            [("LEAD_PF", 1), ("LEAD_NR", 1), ("LEAD_CT", 1)],
+    "Produktivitas Diri":   [("C", 1), ("GRIT_PE", 1)],
+    "Potensi Talenta":      [("C", 1), ("GRIT_PE", 1), ("SELFCTRL", 1), ("VIG", 1)],
+    "Kesehatan Mental":     [("WHO5", 1), ("RESIL", 1)],
+    "Sales Readiness":      [("SALES_DRIVE", 1), ("SALES_RES", 1), ("SALES_REL", 1), ("SALES_TGT", 1)],
 }
 
 def compute_indices(scores: dict) -> dict:
