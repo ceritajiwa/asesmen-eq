@@ -572,3 +572,77 @@ INST_SHORT.update({
  "SERVANT": "X. Servant Leadership (8 item)",
  "JUSTICE": "Y. Keadilan Organisasi (12 item)",
 })
+
+
+# ============================================================
+# INSTRUMEN BATCH 4 - KONTEKS ASPEN MEDICAL (RS hasil akuisisi)
+# VALUES  = Kesesuaian 5 nilai inti Aspen (Respect/Integrity/Compassion/Teamwork/Excellence)
+#           yang dirasakan di RS saat ini -> kristalisasi budaya & gap vs aspirasi (target 80)
+# SAFETY  = Budaya Keselamatan Pasien (adaptasi HSOPSC/AHRQ, domain publik)
+# CHANGE  = Kesiapan Perubahan (konteks masa transisi pasca-akuisisi)
+# ============================================================
+EXTRA4 = [
+ dict(key="VALUES", name="Bagian 26 - Kesesuaian Nilai Aspen Medical",
+      intro="Nilai apa yang TERLIHAT dalam praktik sehari-hari di rumah sakit ini SAAT INI? "
+            "Bukan nilai yang diharapkan, melainkan yang benar-benar terjadi. Target aspirasi = 80.",
+      scale=SCALE_15, min=1, max=5, items=[
+   dict(n=1,  dim="V_RESPECT", rev=False, text="Di sini, setiap orang diperlakukan dengan hormat, apa pun jabatannya."),
+   dict(n=2,  dim="V_RESPECT", rev=False, text="Pendapat pasien dan keluarganya didengarkan dengan sungguh-sungguh."),
+   dict(n=3,  dim="V_INTEG",   rev=False, text="Orang-orang di sini berkata jujur bahkan ketika jujur itu tidak menguntungkan."),
+   dict(n=4,  dim="V_INTEG",   rev=False, text="Kata dan tindakan para pemimpin di sini konsisten."),
+   dict(n=5,  dim="V_COMP",    rev=False, text="Kebutuhan pasien diutamakan di atas prosedur yang kaku."),
+   dict(n=6,  dim="V_COMP",    rev=False, text="Karyawan peduli pada kesejahteraan pasien bahkan di luar tugasnya."),
+   dict(n=7,  dim="V_TEAM",    rev=False, text="Berbagai profesi (dokter, perawat, admin) bekerja sebagai satu tim."),
+   dict(n=8,  dim="V_TEAM",    rev=False, text="Bantuan antar-unit datang dengan cepat saat dibutuhkan."),
+   dict(n=9,  dim="V_EXCEL",   rev=False, text="Standar mutu pelayanan terus ditingkatkan, bukan sekadar dipertahankan."),
+   dict(n=10, dim="V_EXCEL",   rev=False, text="Kesalahan dipelajari untuk memperbaiki sistem, bukan untuk menyalahkan orang."),
+ ]),
+ dict(key="SAFETY", name="Bagian 27 - Budaya Keselamatan Pasien (adaptasi HSOPSC)",
+      intro="Jawab berdasarkan kondisi rumah sakit SAAT INI. Keselamatan pasien adalah fondasi klinis Aspen.",
+      scale=SCALE_15, min=1, max=5, items=[
+   dict(n=1,  dim="SAFE_COM",  rev=False, text="Staf merasa aman melaporkan kesalahan atau hampir-salah tanpa takut dihukum."),
+   dict(n=2,  dim="SAFE_JUST", rev=False, text="Ketika insiden terjadi, fokusnya memperbaiki proses, bukan mencari kambing hitam."),
+   dict(n=3,  dim="SAFE_PRI",  rev=False, text="Keselamatan pasien diutamakan bahkan saat rumah sakit sangat sibuk."),
+   dict(n=4,  dim="SAFE_COM",  rev=False, text="Informasi penting tentang kondisi pasien disampaikan jelas antar-shift."),
+   dict(n=5,  dim="SAFE_JUST", rev=False, text="Staf berani mengakui kesalahan mereka sendiri."),
+   dict(n=6,  dim="SAFE_PRI",  rev=False, text="Peralatan dan prosedur keselamatan selalu dicek sebelum digunakan."),
+   dict(n=7,  dim="SAFE_COM",  rev=False, text="Atasan menyambut laporan masalah keselamatan sebagai masukan, bukan gangguan."),
+   dict(n=8,  dim="SAFE_JUST", rev=False, text="Kesalahan tidak disembunyikan, melainkan dibahas untuk dicari solusinya."),
+   dict(n=9,  dim="SAFE_PRI",  rev=False, text="Jika ada risiko terhadap pasien, tugas lain boleh tertunda."),
+   dict(n=10, dim="SAFE_COM",  rev=False, text="Komunikasi antar-profesi (dokter-perawat-farmasi) berjalan terbuka."),
+   dict(n=11, dim="SAFE_JUST", rev=False, text="Staf yang melaporkan masalah mendapat apresiasi, bukan masalah tambahan."),
+   dict(n=12, dim="SAFE_PRI",  rev=False, text="Manajemen menunjukkan komitmen nyata pada keselamatan pasien, bukan hanya slogan."),
+ ]),
+ dict(key="CHANGE", name="Bagian 28 - Kesiapan Perubahan (Masa Transisi)",
+      intro="Jawab berdasarkan perasaan Anda menghadapi masa perubahan yang sedang berlangsung.",
+      scale=SCALE_15, min=1, max=5, items=[
+   dict(n=1, dim="CHANGE", rev=False, text="Saya paham mengapa rumah sakit ini perlu berubah."),
+   dict(n=2, dim="CHANGE", rev=False, text="Perubahan yang sedang berlangsung memiliki arah yang jelas."),
+   dict(n=3, dim="CHANGE", rev=False, text="Saya percaya kepemimpinan mampu membawa perubahan ini."),
+   dict(n=4, dim="CHANGE", rev=False, text="Saya merasa mampu beradaptasi dengan cara kerja yang baru."),
+   dict(n=5, dim="CHANGE", rev=False, text="Perubahan ini membawa harapan yang lebih baik bagi rumah sakit."),
+   dict(n=6, dim="CHANGE", rev=False, text="Saya mendapat informasi yang cukup tentang perubahan yang terjadi."),
+   dict(n=7, dim="CHANGE", rev=False, text="Saya punya dukungan yang cukup untuk melewati masa perubahan ini."),
+   dict(n=8, dim="CHANGE", rev=False, text="Secara umum, saya siap dengan masa transisi ini."),
+ ]),
+]
+INSTRUMENTS += EXTRA4
+
+DIMS.update({
+ "V_RESPECT": dict(label="Nilai: Respect (Dihormati)",              radar="Respect",    dir="good", target=80),
+ "V_INTEG":   dict(label="Nilai: Integrity (Integritas)",            radar="Integrity",  dir="good", target=80),
+ "V_COMP":    dict(label="Nilai: Compassion (Kompasi)",              radar="Compassion", dir="good", target=80),
+ "V_TEAM":    dict(label="Nilai: Teamwork (Kerja Sama)",             radar="Teamwork",   dir="good", target=80),
+ "V_EXCEL":   dict(label="Nilai: Pursuit of Excellence (Keunggulan)",radar="Excellence", dir="good", target=80),
+ "SAFE_COM":  dict(label="Keselamatan: Komunikasi Terbuka",          radar="Komunikasi Aman", dir="good", target=65),
+ "SAFE_JUST": dict(label="Keselamatan: Belajar dari Insiden",        radar="Just Culture",    dir="good", target=65),
+ "SAFE_PRI":  dict(label="Keselamatan: Prioritas Keselamatan",       radar="Safety First",    dir="good", target=65),
+ "CHANGE":    dict(label="Kesiapan Perubahan (Masa Transisi)",       radar="Siap Berubah",    dir="good", target=60),
+})
+DIM_ORDER = list(DIMS.keys())
+
+INST_SHORT.update({
+ "VALUES": "Z. Kesesuaian Nilai Aspen (10 item)",
+ "SAFETY": "AA. Budaya Keselamatan Pasien (12 item)",
+ "CHANGE": "AB. Kesiapan Perubahan (8 item)",
+})
