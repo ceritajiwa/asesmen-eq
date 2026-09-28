@@ -13,7 +13,7 @@ from insights import (individual_insights, grouped_insights, gap_analysis,
 from hr_analytics import (clusterize, cluster_summary, band_counts_health, CLUSTERS,
                           compute_indices, healthify, build_action_plan, FLIP)
 from charts import (radar_chart, bar_chart_targets, dept_chart, cluster_donut,
-                    index_heatmap, band_distribution_chart, action_map_chart)
+                    index_heatmap, band_distribution_chart, action_map_chart, dims_heatmap)
 from pdf_report import individual_pdf, company_pdf
 from questions import EXAM_QUESTIONS, SESSION_NAMES, PASSING_SCORE
 from bei import (BEI_PROMPTS, STRUCT_FIELDS, structure_bei, bei_participant_pdf, bei_company_pdf, fetch_bei)
@@ -489,6 +489,12 @@ else:
                         if heat_png:
                             st.image(heat_png, use_container_width=True)
                             st.caption("Gambar 4. " + CAPTIONS["heat"])
+                        dims_heat_png = dims_heatmap(df_scores, cols)
+                        if dims_heat_png:
+                            st.subheader("🗺️ Peta Skor per Dimensi")
+                            st.image(dims_heat_png, use_container_width=True)
+                            st.caption("Gambar 4b. Setiap kolom adalah satu dimensi yang diukur; "
+                                       "merah = area yang perlu intervensi, hijau = kekuatan tim.")
                         for cid in [1, 2, 3, 4]:
                             sub = idx_df[idx_df["cluster"] == cid]
                             if sub.empty:

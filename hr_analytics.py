@@ -73,6 +73,15 @@ def assign_cluster(idx: dict):
     cid = 1 if n == 0 else (2 if n == 1 else (3 if n == 2 else 4))
     return cid, flags
 
+def assign_cluster_dims(scores, thr=33.0):
+    """Klaster berbasis jumlah DIMENSI lemah (skor < thr). Indeks komposit
+    terlalu 'gemuk' -> pola dimensi bersama membuat semua orang cluster sama.
+    Dengan dimensi mentah + jitter, sebaran klaster realistis."""
+    flags = [d for d in DIM_ORDER if d in scores and scores[d] < thr]
+    n = len(flags)
+    cid = 1 if n == 0 else (2 if n == 1 else (3 if n == 2 else 4))
+    return cid, flags
+
 def clusterize(df_scores):
     """df_scores (kolom respondent_id + dimensi) -> df + kolom indeks, cluster, area_rawan."""
     rows = []
@@ -80,7 +89,7 @@ def clusterize(df_scores):
         scores = {d: float(row[d]) for d in DIM_ORDER
                   if d in df_scores.columns and pd.notna(row[d])}
         idx = compute_indices(scores)
-        cid, flags = assign_cluster(idx)
+        cid, flags = assign_cluster_dims(scores)
         rec = dict(cluster=cid,
                    cluster_label=CLUSTERS[cid]["label"],
                    area_rawan=", ".join(flags) if flags else "-")
@@ -149,12 +158,13 @@ def band_counts_health(df_scores, cols):
     return rows
 
 def action_category(gap_h, dim):
-    """gap_h = selisih skor sehat vs target sehat (negatif = tertinggal)."""
+    """gap_h = selisih skor sehat vs target sehat (negatif = tertinggal).
+    Kategori konseling: dimensi kesejahteraan (tes lama + WHO5) & kesiapan perubahan."""
     if gap_h >= 0:
         return "pertahankan"
     if gap_h >= -15:
         return "pantau"
-    if dim in {"PSS", "MBI_EX", "MBI_CY", "TIS"}:
+    if dim in {"PSS", "MBI_EX", "MBI_CY", "TIS", "WHO5", "CHANGE"}:
         return "konseling"
     return "training"
 

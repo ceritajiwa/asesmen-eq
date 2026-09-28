@@ -185,3 +185,28 @@ def _to_png(fig):
     plt.close(fig)
     buf.seek(0)
     return buf.read()
+
+
+def dims_heatmap(df_scores, dims, title="Peta Skor per Dimensi (merah = perlu perhatian, hijau = kuat)",
+                 max_rows=30, figsize=(12, 8)):
+    """Heatmap responden x SEMUA dimensi terukur (kristalisasi budaya)."""
+    dims = [d for d in dims if d in df_scores.columns]
+    if not dims or df_scores.empty:
+        return None
+    df = df_scores.sort_values(dims[0]).head(max_rows)
+    name_col = "full_name" if "full_name" in df.columns else None
+    labels = [str(n)[:16] for n in df[name_col]] if name_col else [f"Resp {i+1}" for i in range(len(df))]
+    col_labels = [DIMS[d]["radar"] + ("*" if d in FLIP else "") for d in dims]
+    data = df[dims].values.astype(float)
+    fig, ax = plt.subplots(figsize=figsize)
+    im = ax.imshow(data, cmap="RdYlGn", vmin=0, vmax=100, aspect="auto")
+    ax.set_xticks(range(len(dims))); ax.set_xticklabels(col_labels, fontsize=8, rotation=30, ha="right")
+    ax.set_yticks(range(len(labels))); ax.set_yticklabels(labels, fontsize=8)
+    for i in range(data.shape[0]):
+        for j in range(data.shape[1]):
+            ax.text(j, i, f"{data[i,j]:.0f}", ha="center", va="center", fontsize=7)
+    ax.set_title(title + (f" (tampil {len(df)} dari {len(df_scores)})" if len(df_scores) > max_rows else ""),
+                 fontsize=11, fontweight="bold")
+    fig.colorbar(im, ax=ax, shrink=0.8, label="Skor (0-100, " + SCALE_NOTE + ")")
+    fig.tight_layout()
+    return _to_png(fig)
