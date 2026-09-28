@@ -41,9 +41,24 @@ def fetch_respondents(training_id):
     return sb.table("respondents").select("*").eq("training_id", training_id).execute().data or []
 
 def fetch_responses(ids):
+    """Ambil SEMUA baris responses (Supabase membatasi ~1000 baris per query
+    -> wajib pagination supaya data besar tidak terpotong)."""
     if not ids:
         return []
-    return sb.table("responses").select("*").in_("respondent_id", ids).execute().data or []
+    all_rows = []
+    PAGE = 1000
+    for i in range(0, len(ids), 200):          # pecah responden per 200 orang
+        part = ids[i:i+200]
+        offset = 0
+        while True:
+            res = sb.table("responses").select("*").in_("respondent_id", part) \
+                       .order("id").range(offset, offset + PAGE - 1).execute()
+            rows = res.data or []
+            all_rows.extend(rows)
+            if len(rows) < PAGE:
+                break
+            offset += PAGE
+    return all_rows
 
 def get_enabled(training):
     raw = training.get("enabled_instruments")
