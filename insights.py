@@ -336,7 +336,7 @@ def gap_analysis(mean_scores):
     """Arah-aware: gap positif = sudah baik/melebihi target; negatif = perlu perhatian."""
     rows = []
     for dim in DIM_ORDER:
-        if dim not in mean_scores:
+        if dim not in mean_scores or dim not in DIMS:
             continue
         d = DIMS[dim]; val = mean_scores[dim]
         gap = (val - d["target"]) if d["dir"] == "good" else (d["target"] - val)
@@ -347,9 +347,13 @@ def gap_analysis(mean_scores):
     priority = sorted([r for r in rows if r["gap"] < 0], key=lambda r: r["gap"])
     return rows, priority
 
+def _valid_row(r):
+    return isinstance(r, dict) and "dim" in r and "gap" in r
+
 def strengths_and_concerns(gap_rows):
-    strengths = [r for r in gap_rows if r["gap"] >= 0]
-    concerns = sorted([r for r in gap_rows if r["gap"] < 0], key=lambda r: r["gap"])
+    rows = [r for r in gap_rows if _valid_row(r)]
+    strengths = [r for r in rows if r["gap"] >= 0]
+    concerns = sorted([r for r in rows if r["gap"] < 0], key=lambda r: r["gap"])
     return strengths, concerns
 
 def soft_recommendations(priority):
@@ -485,11 +489,15 @@ def hr_opening(training_name, n, strengths, concerns, csum):
             f"bisa langsung dipakai untuk percakapan dengan manajemen - tanpa istilah teknis yang berbelit.")
 
 def hr_risks(concerns):
-    """Daftar kalimat risiko untuk dimensi yang di bawah target (maks 5)."""
+    """Daftar kalimat risiko untuk dimensi yang di bawah target (maks 5). Tahan-banting."""
     out = []
     for r in concerns[:5]:
-        out.append(f"**{r['label']}** - {RISK.get(r['dim'], 'Kondisi ini berisiko membesar jika dibiarkan tanpa tindak lanjut.')}")
-    return out
+        if not isinstance(r, dict):
+            continue
+        dim = r.get("dim")
+        label = r.get("label") or dim or "Aspek"
+        out.append(f"**{label}** - {RISK.get(dim, 'Kondisi ini berisiko membesar jika dibiarkan tanpa tindak lanjut.')}")
+    return out or ["Tidak ada risiko signifikan yang teridentifikasi pada data saat ini."]
 
 # --- Dimensi instrumen tambahan (katalog produk) ---
 DIM_INFO.update({'O': 'Keterbukaan mengukur seberapa jauh seseorang menyukai ide baru dan cara berpikir imajinatif.', 'C': 'Ketertiban mengukur seberapa jauh seseorang terorganisir, dapat diandalkan, dan menepati rencana.', 'E': 'Extraversi mengukur energi sosial: kenyamanan berinteraksi dan terlihat dalam kelompok.', 'A': 'Keramahan mengukur kecenderungan percaya, bekerja sama, dan berempati pada orang lain.', 'N': 'Neurotisisme mengukur kecenderungan cemas, mudah tersinggung, dan tidak stabil secara emosional. Skor tinggi = perlu perhatian.', 'GRIT_PE': 'Ketekunan mengukur kemampuan mempertahankan usaha meski bosan, gagal, atau butuh waktu lama.', 'GRIT_CI': 'Konsistensi minat mengukur kemampuan bertahan pada minat dan tujuan jangka panjang.', 'SELFCTRL': 'Kontrol diri mengukur kemampuan menahan godaan, menjaga fokus, dan bertindak sesuai rencana.', 'RESIL': 'Resiliensi mengukur kecepatan dan kemampuan diri pulih setelah tekanan atau kegagalan.', 'PROCR': 'Prokrastinasi mengukur kecenderungan menunda-nunda tugas penting. Skor tinggi = produktivitas terancam.', 'LEAD_PF': 'Fokus perilaku mengukur kemampuan menetapkan target diri, memantau kemajuan, dan mengevaluasi hasil kerja sendiri.', 'LEAD_NR': 'Motivasi alami mengukur kemampuan menemukan kesenangan dan makna dari tugas itu sendiri.', 'LEAD_CT': 'Pikiran konstruktif mengukur kebiasaan berpikir positif dan mengambil pelajaran dari kegagalan.', 'KLAN': 'Budaya klan menilai sejauh mana tim terasa seperti keluarga: saling peduli, partisipatif, dan loyal.', 'ADHO': 'Budaya adhocracy menilai sejauh mana tim mendukung inovasi, risiko, dan hal baru.', 'MARKET': 'Budaya pasar menilai sejauh mana tim digerakkan target, kompetisi, dan hasil.', 'HIER': 'Budaya hierarki menilai sejauh mana tim dijalankan aturan, prosedur, struktur, dan kepastian.', 'COG_GMA': 'Screening kognitif mengukur kemampuan logika dan numerik dasar; ini penapisan awal, bukan pengganti tes inteligensi bersistem penuh.'})

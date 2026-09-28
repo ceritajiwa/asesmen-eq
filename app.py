@@ -441,6 +441,8 @@ else:
                                                     left_on="respondent_id", right_on="id", how="left")
                         cols = [d for d in DIM_ORDER if d in df_scores.columns]
                         mean_scores = {d: float(df_scores[d].mean()) for d in cols}
+                        mean_scores = {k: v for k, v in mean_scores.items()
+                                       if k in DIMS and not (isinstance(v, float) and v != v)}  # buang NaN & asing
                         gap_rows, priority = gap_analysis(mean_scores)
                         strengths, concerns = strengths_and_concerns(gap_rows)
                         recs = soft_recommendations(priority)
