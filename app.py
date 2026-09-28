@@ -511,7 +511,7 @@ else:
                             for r in concerns:
                                 st.markdown(f"- **{r['label']}** (rata-rata {r['mean']:.0f}/100; target "
                                             f"{'maksimal' if r['dir']=='bad' else 'minimal'} {r['target']}): "
-                                            f"{CONSEQUENCE[r['dim']]}")
+                                            f"{CONSEQUENCE.get(r['dim'], 'Kondisi ini perlu perhatian berkelanjutan.')}")
                         st.markdown("**🌱 Kebutuhan pengembangan yang disarankan**")
                         for s in recs:
                             st.markdown(s if s.startswith("- ") else f"- {s}")
