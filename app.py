@@ -72,6 +72,7 @@ def get_enabled(training):
 
 st.sidebar.title("🧠 Asesmen EQ")
 st.sidebar.caption("Cerita Jiwa Training Center")
+st.sidebar.caption("App v2026-09-28c")
 page = st.sidebar.radio("Menu", ["📝 Mulai Asesmen", "🎓 Ujian Sertifikasi", "⬇️ Unduh Hasil Saya", "👨‍⚕️ Menu Trainer (BEI)", "🔐 Admin"])
 st.sidebar.divider()
 
