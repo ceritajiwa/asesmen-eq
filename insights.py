@@ -327,7 +327,7 @@ def grouped_insights(scores):
                         and d in {x["dim"] for x in inst["items"]}]
         if not dims_present:
             continue
-        meta = INSTRUMENT_META[inst["key"]]
+        meta = INSTRUMENT_META.get(inst["key"]) or {"title": inst["name"], "plain": inst.get("intro", "")}
         rows = [(DIMS[d]["label"], band(scores[d]), _read(scores, d)) for d in dims_present]
         groups.append((inst["key"], meta["title"], meta["plain"], rows))
     return groups
