@@ -23,6 +23,9 @@ INDEX_COMPONENTS = {
     "Potensi Talenta":      [("C", 1), ("GRIT_PE", 1), ("SELFCTRL", 1), ("VIG", 1)],
     "Kesehatan Mental":     [("WHO5", 1), ("RESIL", 1)],
     "Sales Readiness":      [("SALES_DRIVE", 1), ("SALES_RES", 1), ("SALES_REL", 1), ("SALES_TGT", 1)],
+    "Nilai Aspen":          [("V_RESPECT", 1), ("V_INTEG", 1), ("V_COMP", 1), ("V_TEAM", 1), ("V_EXCEL", 1)],
+    "Keselamatan Pasien":   [("SAFE_COM", 1), ("SAFE_JUST", 1), ("SAFE_PRI", 1)],
+    "Kesiapan Perubahan":   [("CHANGE", 1)],
 }
 
 def compute_indices(scores: dict) -> dict:
