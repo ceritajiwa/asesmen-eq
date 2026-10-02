@@ -248,7 +248,7 @@ elif page == "⬇️ Unduh Hasil Saya":
 # ============================== PAGE: UJIAN ==============================
 elif page == "🎓 Ujian Sertifikasi":
     st.title("🎓 Ujian Sertifikasi")
-    st.caption(f"40 soal pilihan ganda (studi kasus) - nilai kelulusan {PASSING_SCORE} "
+    st.caption("40 soal pilihan ganda (studi kasus) - nilai kelulusan 75 "
                "(minimal 30 benar) - boleh mengulang sampai lulus.")
 
     trainings = fetch_trainings()
@@ -265,6 +265,8 @@ elif page == "🎓 Ujian Sertifikasi":
     EXAM_QUESTIONS = pkg["questions"]
     SESSION_NAMES = pkg["sessions"]
     PASSING_SCORE = pkg["passing"]
+    st.caption(f"Paket: **{pkg['title']}** - kelulusan minimal **{PASSING_SCORE}** "
+               f"({round(PASSING_SCORE/100*40)} benar dari 40 soal)")
 
     if training.get("access_code") and st.session_state.get("exam_ok") != training["id"]:
         code = st.text_input("Kode akses", type="password", key="exam_code")
