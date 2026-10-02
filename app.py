@@ -331,9 +331,9 @@ elif page == "🎓 Ujian Sertifikasi":
     st.divider()
     st.subheader("Soal Ujian")
     answers = {}
-    _sesi_list = sorted(SESSION_NAMES)
+    _sesi_list = sorted(SESSION_NAMES, key=lambda k: int(k))  # kunci sesi berupa string di JSON
     for s in _sesi_list:
-        _qs = [x for x in EXAM_QUESTIONS if x["session"] == s]
+        _qs = [x for x in EXAM_QUESTIONS if x["session"] == int(s)]
         with st.expander(f"**{SESSION_NAMES[s]}** (Soal {_qs[0]['n']}-{_qs[-1]['n']})",
                          expanded=(s == _sesi_list[0])):
             for q in _qs:
