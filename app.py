@@ -308,13 +308,69 @@ elif page == "🎓 Ujian Sertifikasi":
                         mark = "  ❌ **(jawaban Anda)**"
                     st.markdown(f"- {chr(65+i)}. {opt}{mark}")
         st.divider()
-        cc1, cc2 = st.columns(2)
-        if cc1.button("🔁 Ulangi Ujian", type="primary", use_container_width=True):
+        _wrong = [q["n"] for q in EXAM_PACKAGES[r["pkg"]]["questions"]
+                  if r["answers"].get(q["n"]) != q["key"]]
+        cc1, cc2, cc3 = st.columns(3)
+        if not r["passed"] and _wrong:
+            if cc1.button(f"🎯 Ulangi {_wrong_n} Soal Salah".replace("_wrong_n", str(len(_wrong))),
+                          type="primary", use_container_width=True):
+                st.session_state["exam_retry"] = dict(
+                    pkg=r["pkg"], wrong=_wrong, name=r["name"], email=r.get("email", ""),
+                    keep=r["correct"], prev=dict(r["answers"]))
+                del st.session_state["exam_result"]
+                st.rerun()
+        if cc2.button("🔁 Ulang Semua (40 Soal)", use_container_width=True):
             del st.session_state["exam_result"]
             st.rerun()
-        if cc2.button("Selesai", use_container_width=True):
+        if cc3.button("Selesai", use_container_width=True):
             del st.session_state["exam_result"]
             st.info("Terima kasih. Sertifikat fisik/digital akan diberikan oleh trainer Anda.")
+        st.stop()
+
+    # ---- MODE PERBAIKAN: hanya soal yang salah ----
+    if "exam_retry" in st.session_state:
+        rz = st.session_state["exam_retry"]
+        rpkg = EXAM_PACKAGES[rz["pkg"]]
+        rq = [q for q in rpkg["questions"] if q["n"] in rz["wrong"]]
+        PASSING_SCORE = rpkg["passing"]
+        st.info(f"🎯 **Mode Perbaikan** - {len(rq)} soal yang sebelumnya salah. "
+                f"Benar sebelumnya: {rz['keep']}/40. Jawab ulang, lalu kumpulkan.")
+        answers_r = {}
+        _by_sess = {}
+        for q in rq:
+            _by_sess.setdefault(q["session"], []).append(q)
+        for s in sorted(_by_sess, key=lambda k: int(k)):
+            qs_r = _by_sess[s]
+            with st.expander(f"**{rpkg['sessions'][str(s)]}** ({len(qs_r)} soal)",
+                             expanded=(s == sorted(_by_sess, key=lambda k: int(k))[0])):
+                for q in qs_r:
+                    opts = [f"{chr(65+i)}. {o}" for i, o in enumerate(q["opts"])]
+                    val = st.radio(f"**{q['n']}.** {q['q']}", opts, key=f"retry_q{q['n']}", index=None)
+                    if val is not None:
+                        answers_r[q["n"]] = ord(val[0]) - 65
+        answered_r = len(answers_r)
+        st.progress(answered_r / len(rq), text=f"Terjawab: {answered_r}/{len(rq)}")
+        if st.button("✅ Kumpulkan Perbaikan", type="primary", use_container_width=True):
+            if answered_r < len(rq):
+                st.error(f"Masih ada {len(rq) - answered_r} soal belum dijawab.")
+            else:
+                benar_r = sum(1 for q in rq if answers_r.get(q["n"]) == q["key"])
+                total_correct = rz["keep"] + benar_r
+                score = round(total_correct / 40 * 100)
+                passed = score >= PASSING_SCORE
+                try:
+                    sb.table("exam_attempts").insert(dict(
+                        training_id=training["id"], full_name=rz["name"],
+                        email=rz["email"], correct=total_correct,
+                        score=score, passed=passed, package=rz["pkg"])).execute()
+                except Exception:
+                    pass
+                merged = dict(rz["prev"]); merged.update(answers_r)
+                st.session_state["exam_result"] = dict(
+                    name=rz["name"], email=rz["email"], answers=merged,
+                    correct=total_correct, score=score, passed=passed, pkg=rz["pkg"])
+                del st.session_state["exam_retry"]
+                st.rerun()
         st.stop()
 
     # ---- biodata ----
@@ -358,8 +414,8 @@ elif page == "🎓 Ujian Sertifikasi":
             except Exception:
                 pass  # tabel belum ada pun ujian tetap jalan
             st.session_state["exam_result"] = dict(
-                name=name.strip(), answers=answers, correct=correct,
-                score=score, passed=passed, pkg=pkg_key)
+                name=name.strip(), email=email.strip().lower(), answers=answers,
+                correct=correct, score=score, passed=passed, pkg=pkg_key)
             st.rerun()
 
 
