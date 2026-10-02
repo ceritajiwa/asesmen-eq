@@ -15,7 +15,7 @@ from hr_analytics import (clusterize, cluster_summary, band_counts_health, CLUST
 from charts import (radar_chart, bar_chart_targets, dept_chart, cluster_donut,
                     index_heatmap, band_distribution_chart, action_map_chart, dims_heatmap)
 from pdf_report import individual_pdf, company_pdf
-from questions import EXAM_QUESTIONS, SESSION_NAMES, PASSING_SCORE
+from questions import EXAM_PACKAGES
 from bei import (BEI_PROMPTS, STRUCT_FIELDS, structure_bei, bei_participant_pdf, bei_company_pdf, fetch_bei)
 
 st.set_page_config(page_title="Asesmen EQ | Cerita Jiwa", page_icon="🧠", layout="wide")
@@ -247,7 +247,7 @@ elif page == "⬇️ Unduh Hasil Saya":
 
 # ============================== PAGE: UJIAN ==============================
 elif page == "🎓 Ujian Sertifikasi":
-    st.title("🎓 Ujian Sertifikasi CERC")
+    st.title("🎓 Ujian Sertifikasi")
     st.caption(f"40 soal pilihan ganda (studi kasus) - nilai kelulusan {PASSING_SCORE} "
                "(minimal 30 benar) - boleh mengulang sampai lulus.")
 
@@ -257,6 +257,14 @@ elif page == "🎓 Ujian Sertifikasi":
         st.stop()
     tname = st.selectbox("Pilih Perusahaan / Training", [t["name"] for t in trainings], key="exam_t")
     training = next(t for t in trainings if t["name"] == tname)
+
+    pkg_names = {k: v["title"] for k, v in EXAM_PACKAGES.items()}
+    pkg_key = st.selectbox("Pilih Paket Ujian", list(EXAM_PACKAGES.keys()),
+                           format_func=lambda k: pkg_names[k], key="exam_pkg")
+    pkg = EXAM_PACKAGES[pkg_key]
+    EXAM_QUESTIONS = pkg["questions"]
+    SESSION_NAMES = pkg["sessions"]
+    PASSING_SCORE = pkg["passing"]
 
     if training.get("access_code") and st.session_state.get("exam_ok") != training["id"]:
         code = st.text_input("Kode akses", type="password", key="exam_code")
@@ -277,14 +285,14 @@ elif page == "🎓 Ujian Sertifikasi":
         c2.metric("Benar", f"{r['correct']} / 40")
         c3.metric("Status", "LULUS ✅" if r["passed"] else "BELUM LULUS ❌")
         if r["passed"]:
-            st.success(f"Selamat, **{r['name']}**! Anda dinyatakan LULUS Ujian Sertifikasi CERC.")
+            st.success(f"Selamat, **{r['name']}**! Anda dinyatakan LULUS Ujian Sertifikasi.")
             st.balloons()
         else:
             st.error(f"Nilai Anda {r['score']} - belum mencapai {PASSING_SCORE}. "
                      "Pelajari kembali materi, lalu ulangi ujian. Boleh mengulang tanpa batas.")
         st.divider()
         st.subheader("📋 Review Jawaban")
-        for q in EXAM_QUESTIONS:
+        for q in EXAM_PACKAGES[r["pkg"]]["questions"]:
             ua = r["answers"].get(q["n"])
             ok = ua == q["key"]
             label = f"{'✅' if ok else '❌'} Soal {q['n']} - {'Benar' if ok else 'Salah'}"
@@ -321,9 +329,12 @@ elif page == "🎓 Ujian Sertifikasi":
     st.divider()
     st.subheader("Soal Ujian")
     answers = {}
-    for s in [1, 2, 3, 4]:
-        with st.expander(f"**{SESSION_NAMES[s]}** (Soal {(s-1)*10+1}-{s*10})", expanded=(s == 1)):
-            for q in [x for x in EXAM_QUESTIONS if x["session"] == s]:
+    _sesi_list = sorted(SESSION_NAMES)
+    for s in _sesi_list:
+        _qs = [x for x in EXAM_QUESTIONS if x["session"] == s]
+        with st.expander(f"**{SESSION_NAMES[s]}** (Soal {_qs[0]['n']}-{_qs[-1]['n']})",
+                         expanded=(s == _sesi_list[0])):
+            for q in _qs:
                 opts = [f"{chr(65+i)}. {o}" for i, o in enumerate(q["opts"])]
                 val = st.radio(f"**{q['n']}.** {q['q']}", opts, key=f"exam_q{q['n']}", index=None)
                 if val is not None:
@@ -341,12 +352,12 @@ elif page == "🎓 Ujian Sertifikasi":
                 sb.table("exam_attempts").insert(dict(
                     training_id=training["id"], full_name=name.strip(),
                     email=email.strip().lower(), correct=correct,
-                    score=score, passed=passed)).execute()
+                    score=score, passed=passed, package=pkg_key)).execute()
             except Exception:
                 pass  # tabel belum ada pun ujian tetap jalan
             st.session_state["exam_result"] = dict(
                 name=name.strip(), answers=answers, correct=correct,
-                score=score, passed=passed)
+                score=score, passed=passed, pkg=pkg_key)
             st.rerun()
 
 
@@ -745,8 +756,9 @@ else:
                 c1.metric("Total Percobaan", len(att))
                 c2.metric("Lulus", lulus)
                 c3.metric("Belum Lulus", len(att) - lulus)
-                df_att = pd.DataFrame(att)[["full_name", "email", "correct", "score", "passed", "created_at"]]
-                df_att.columns = ["Nama", "Email", "Benar", "Nilai", "Lulus", "Waktu"]
+                cols_t5 = ["full_name", "email", "package", "correct", "score", "passed", "created_at"]
+                df_att = pd.DataFrame(att)[[c for c in cols_t5 if c in pd.DataFrame(att).columns]]
+                df_att.columns = [c for c in ["Nama", "Email", "Paket", "Benar", "Nilai", "Lulus", "Waktu"][:len(df_att.columns)]]
                 df_att["Lulus"] = df_att["Lulus"].map({True: "✅ Lulus", False: "❌ Belum"})
                 st.dataframe(df_att, hide_index=True, use_container_width=True)
                 st.download_button("⬇️ CSV Riwayat Ujian", df_att.to_csv(index=False).encode(),
