@@ -248,8 +248,8 @@ elif page == "⬇️ Unduh Hasil Saya":
 # ============================== PAGE: UJIAN ==============================
 elif page == "🎓 Ujian Sertifikasi":
     st.title("🎓 Ujian Sertifikasi")
-    st.caption("40 soal pilihan ganda (studi kasus) - nilai kelulusan 75 "
-               "(minimal 30 benar) - boleh mengulang sampai lulus.")
+    st.caption("40 soal pilihan ganda (studi kasus) - nilai kelulusan 70 "
+               "(minimal 28 benar) - boleh mengulang sampai lulus.")
 
     trainings = fetch_trainings()
     if not trainings:
@@ -312,7 +312,7 @@ elif page == "🎓 Ujian Sertifikasi":
                   if r["answers"].get(q["n"]) != q["key"]]
         cc1, cc2, cc3 = st.columns(3)
         if not r["passed"] and _wrong:
-            if cc1.button(f"🎯 Ulangi {_wrong_n} Soal Salah".replace("_wrong_n", str(len(_wrong))),
+            if cc1.button(f"🎯 Ulangi {len(_wrong)} Soal Salah",
                           type="primary", use_container_width=True):
                 st.session_state["exam_retry"] = dict(
                     pkg=r["pkg"], wrong=_wrong, name=r["name"], email=r.get("email", ""),
