@@ -18,6 +18,13 @@ from pdf_report import individual_pdf, company_pdf
 from questions import EXAM_PACKAGES
 from bei import (BEI_PROMPTS, STRUCT_FIELDS, structure_bei, bei_participant_pdf, bei_company_pdf, fetch_bei, _struct_table)
 
+def _jloads(v):
+    if not v:
+        return None
+    if isinstance(v, (dict, list)):
+        return v
+    return json.loads(v)
+
 st.set_page_config(page_title="Asesmen EQ | Cerita Jiwa", page_icon="🧠", layout="wide")
 
 ALL_KEYS = [i["key"] for i in INSTRUMENTS]
@@ -311,8 +318,8 @@ elif page == "👨‍⚕️ Menu Trainer (BEI)":
     else:
         st.caption(f"{len(_sessions)} sesi ditemukan.")
         for s in _sessions:
-            _stc = json.loads(s["structured"]) if s.get("structured") else None
-            _nar = json.loads(s.get("narratives") or "{}")
+            _stc = _jloads(s.get("structured"))
+            _nar = _jloads(s.get("narratives")) or {}
             with st.expander(f"**{s['participant_name']}** - {s.get('counselor_name','-')} "
                              f"({str(s.get('created_at',''))[:10]})"):
                 if _stc and _stc.get("_error"):
