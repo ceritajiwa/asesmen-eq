@@ -90,45 +90,59 @@ def structure_bei(narratives: dict, api_key: str | None) -> dict:
     if not todo:
         return {"_error": "Gagal mengambil daftar model dari Google (endpoint v1beta/models). "
                           "Key mungkin benar tapi Generative Language API belum diaktifkan di project Google Cloud-nya."}
-    last_err = ""
-    for _attempt in range(5):
-        if not todo:
-            break
+    statuses = []          # status tiap model yang dicoba
+    busy_rounds = 0        # putaran khusus untuk model yang sibuk
+    while todo and (len(tried) < 8) and busy_rounds < 4:
         model = todo.pop(0)
-        if model in tried:
-            continue
-        tried.append(model)
-        try:
-            r = requests.post(f"{GEMINI_BASE}{model}:generateContent", params={"key": api_key},
-                              json={"contents": [{"parts": [{"text": prompt}]}],
-                                    "generationConfig": {"responseMimeType": "application/json",
-                                                         "temperature": 0.3}},
-                              timeout=90)
+        _per_model = []
+        for ver in ("v1beta", "v1"):   # model terbaru kadang hanya ada di v1
+            try:
+                r = requests.post(
+                    f"https://generativelanguage.googleapis.com/{ver}/models/{model}:generateContent",
+                    params={"key": api_key},
+                    json={"contents": [{"parts": [{"text": prompt}]}],
+                          "generationConfig": {"responseMimeType": "application/json",
+                                               "temperature": 0.3}},
+                    timeout=90)
+            except Exception as e:
+                statuses.append(f"{model}: gagal koneksi ({e})")
+                break
             if r.status_code == 404:
-                last_err = f"[{model} 404] {r.text[:180]}"
-                continue
+                _per_model.append(f"{ver}=404")
+                continue                      # coba versi endpoint lain
             if r.status_code in (429, 503):
-                last_err = f"[{model} {r.status_code}] sibuk sementara"
-                todo.append(model)
-                import time as _t
-                _t.sleep(2)
-                continue
+                _per_model.append(f"{ver}=sibuk")
+                todo.append(model)            # dicoba lagi di putaran berikutnya
+                busy_rounds += 1
+                import time as _t; _t.sleep(5)
+                break
             if r.status_code != 200:
-                return {"_error": f"Gemini menolak (status {r.status_code}, model {model}): {r.text[:250]}"}
-            text = r.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+                statuses.append(f"{model}: {r.status_code} {r.text[:150]}")
+                break
+            try:
+                text = r.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+            except Exception:
+                statuses.append(f"{model}: respons tidak dikenali")
+                break
             if text.startswith("```"):
                 text = text.strip("`")
                 if text.lower().startswith("json"):
                     text = text[4:]
-            parsed = json.loads(text)
+            try:
+                parsed = json.loads(text)
+            except Exception:
+                statuses.append(f"{model}: JSON tidak terbaca")
+                break
             if not isinstance(parsed, dict) or not parsed:
-                return {"_error": "Respons AI kosong/bukan objek JSON."}
+                statuses.append(f"{model}: JSON kosong")
+                break
             return parsed
-        except Exception as e:
-            return {"_error": f"Gagal memproses respons AI (model {model}): {e}"}
-    return {"_error": "Semua model gagal. Model tersedia dari Google: "
-                      + ", ".join(tried[:10])
-                      + (" | Terakhir: " + last_err if last_err else "")}
+        else:
+            pass
+        tried.append(model)
+        if _per_model:
+            statuses.append(f"{model}: {', '.join(_per_model)}")
+    return {"_error": "Semua model gagal/sibuk. Status: " + " | ".join(statuses[:12])}
 
 def fetch_bei(sb, training_id):
     try:
