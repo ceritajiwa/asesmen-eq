@@ -51,6 +51,28 @@ GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models/"
 # dari pesan error Google ("Please update your code to use models/xxx")
 MODEL_CANDIDATES = ["gemini-3.8-flash", "gemini-flash", "gemini-2.5-flash", "gemini-3.8-flash-latest"]
 
+
+
+def _available_flash_models(api_key):
+    """Tanya Google daftar model yang tersedia untuk key ini, kembalikan
+    id model gemini-flash yang mendukung generateContent (urut pilihan utama dulu)."""
+    try:
+        import requests as _rq
+        r = _rq.get("https://generativelanguage.googleapis.com/v1beta/models",
+                    params={"key": api_key, "pageSize": 250}, timeout=30)
+        if r.status_code != 200:
+            return []
+        ids = [m.get("name", "").replace("models/", "") for m in r.json().get("models", [])]
+        flash = [i for i in ids if "gemini" in i and "flash" in i
+                 and all(x not in i for x in ("image", "aqa", "tts", "live", "thinking", "lite"))]
+        # prioritas: yang ada di MODEL_CANDIDATES duluan, lalu sisanya (versi terbaru di atas)
+        pri = [m for m in MODEL_CANDIDATES if m in flash]
+        rest = [m for m in flash if m not in pri]
+        rest.sort(reverse=True)
+        return pri + rest
+    except Exception:
+        return []
+
 def structure_bei(narratives: dict, api_key: str | None) -> dict:
     """Kirim narasi ke Gemini -> dict terstruktur. Tanpa key: return None."""
     if not api_key:
@@ -64,7 +86,7 @@ def structure_bei(narratives: dict, api_key: str | None) -> dict:
         "Setiap value berupa string Bahasa Indonesia yang ringkas dan profesional (maks 3 kalimat). "
         "Jangan tambahkan key lain, jangan markdown.\n\n" + joined)
     tried = []
-    todo = list(MODEL_CANDIDATES)
+    todo = _available_flash_models(api_key) or list(MODEL_CANDIDATES)
     for _attempt in range(6):  # batasi jumlah percobaan
         if not todo:
             break
