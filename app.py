@@ -249,15 +249,29 @@ elif page == "👨‍⚕️ Menu Trainer (BEI)":
         st.stop()
     tname = st.selectbox("Perusahaan / Training", [t["name"] for t in trainings], key="bei_t")
     training = next(t for t in trainings if t["name"] == tname)
+
+    # muat sesi lama ke form (harus sebelum widget dirender)
+    if "bei_load" in st.session_state:
+        _ld = st.session_state.pop("bei_load")
+        st.session_state["bei_existing"] = "-- peserta baru --"
+        st.session_state["bei_pname"] = _ld["participant"]
+        st.session_state["bei_counselor"] = _ld["counselor"]
+        for _k, _t, _ in BEI_PROMPTS:
+            st.session_state[f"bei_{_k}"] = (_ld["narratives"] or {}).get(_k, "")
+        st.session_state["bei_loaded_id"] = _ld["id"]
+        st.info(f"Sesi {_ld['participant']} dimuat ke form. Proses ulang dengan AI, lalu simpan "
+                f"-> hasil diperbarui pada sesi yang sama.")
+        st.rerun()
+
     resps = fetch_respondents(training["id"])
 
     c1, c2 = st.columns(2)
-    existing = c1.selectbox("Pilih peserta (yang sudah pernah asesmen)", ["-- peserta baru --"] + [r["full_name"] for r in resps])
+    existing = c1.selectbox("Pilih peserta (yang sudah pernah asesmen)", ["-- peserta baru --"] + [r["full_name"] for r in resps], key="bei_existing")
     if existing == "-- peserta baru --":
-        p_name = c2.text_input("Nama peserta")
+        p_name = c2.text_input("Nama peserta", key="bei_pname")
     else:
         p_name = existing
-    counselor = st.text_input("Nama konselor / trainer")
+    counselor = st.text_input("Nama konselor / trainer", key="bei_counselor")
 
     st.divider()
     st.subheader("Panduan Pertanyaan Sesi")
@@ -276,12 +290,17 @@ elif page == "👨‍⚕️ Menu Trainer (BEI)":
             with st.spinner("Menyimpan dan memproses dengan AI..."):
                 api_key = st.secrets.get("GEMINI_API_KEY", None)
                 structured = structure_bei(narratives, api_key)
+                _lid = st.session_state.pop("bei_loaded_id", None)
                 try:
-                    sb.table("bei_sessions").insert(dict(
-                        training_id=training["id"], participant_name=p_name.strip(),
-                        counselor_name=counselor.strip(),
-                        narratives=narratives,
-                        structured=structured)).execute()
+                    if _lid:
+                        sb.table("bei_sessions").update(
+                            dict(narratives=narratives, structured=structured)).eq("id", _lid).execute()
+                    else:
+                        sb.table("bei_sessions").insert(dict(
+                            training_id=training["id"], participant_name=p_name.strip(),
+                            counselor_name=counselor.strip(),
+                            narratives=narratives,
+                            structured=structured)).execute()
                 except Exception as ex:
                     st.error("Gagal menyimpan sesi ke database. Kemungkinan tabel bei_sessions "
                              "belum dibuat - jalankan migrasi SQL (lihat panduan) lalu coba lagi. "
@@ -322,6 +341,14 @@ elif page == "👨‍⚕️ Menu Trainer (BEI)":
             _nar = _jloads(s.get("narratives")) or {}
             with st.expander(f"**{s['participant_name']}** - {s.get('counselor_name','-')} "
                              f"({str(s.get('created_at',''))[:10]})"):
+                _cc1, _cc2 = st.columns([1, 2])
+                if _cc1.button("✏️ Muat ke Form (proses ulang)", key=f"bei_load_{s['id']}"):
+                    st.session_state["bei_load"] = dict(
+                        id=s["id"], participant=s["participant_name"],
+                        counselor=s.get("counselor_name", ""), narratives=_nar)
+                    st.rerun()
+                if st.session_state.get("bei_loaded_id") == s["id"]:
+                    _cc2.info("✓ sesi ini sedang dimuat di form")
                 if _stc and _stc.get("_error"):
                     st.warning(f"AI: {_stc['_error'][:200]}")
                 elif _stc:
