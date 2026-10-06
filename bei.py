@@ -27,8 +27,10 @@ BEI_PROMPTS = [
   "Apa risiko terburuk jika keadaan ini dibiarkan? (resign, konflik, penurunan performa, kesehatan, dsb)"),
  ("rencana", "9. Rencana tindak lanjut",
   "Apa kesepakatan langkah lanjut dari sesi ini? Apa peran peserta, dan apa yang perlu diperusahaan lakukan?"),
- ("kesesuaian", "10. Kesesuaian dengan kebutuhan perusahaan",
-  "Dari sisi kebutuhan perusahaan (jabatan, potensi, tim), apa yang perlu dicatat? Misal: kesiapan promosi, risiko retensi, kebutuhan training/konseling lanjutan."),
+ ("rekomendasi", "10. Rekomendasi Trainer",
+  "Apa rekomendasi Anda sebagai trainer? Tulis secara umum - bisa untuk kebutuhan perusahaan "
+  "(misal: rekrutmen, promosi, penempatan, retensi) maupun untuk pengembangan peserta "
+  "(misal: lanjut konseling, training tambahan, pengembangan diri)."),
 ]
 
 STRUCT_FIELDS = [

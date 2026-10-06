@@ -646,3 +646,7 @@ INST_SHORT.update({
  "SAFETY": "AA. Budaya Keselamatan Pasien (12 item)",
  "CHANGE": "AB. Kesiapan Perubahan (8 item)",
 })
+
+# tampilkan nama asesmen tanpa prefix huruf (A., B., ..., AA.)
+import re as _re
+INST_SHORT = {k: _re.sub(r"^[A-Z]{1,2}\.\s*", "", v) for k, v in INST_SHORT.items()}

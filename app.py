@@ -73,7 +73,7 @@ def get_enabled(training):
 st.sidebar.title("🧠 Asesmen EQ")
 st.sidebar.caption("Cerita Jiwa Training Center")
 st.sidebar.caption("App v2026-09-28c")
-page = st.sidebar.radio("Menu", ["📝 Mulai Asesmen", "🎓 Ujian Sertifikasi", "⬇️ Unduh Hasil Saya", "👨‍⚕️ Menu Trainer (BEI)", "🔐 Admin"])
+page = st.sidebar.radio("Menu", ["📝 Mulai Asesmen", "🎓 Ujian Sertifikasi", "👨‍⚕️ Menu Trainer (BEI)", "🔐 Admin"])
 st.sidebar.divider()
 
 HTAG = {"low": "🔴 perlu perhatian", "mid": "🟡 cukup", "high": "🟢 baik"}
@@ -207,7 +207,7 @@ if page == "📝 Mulai Asesmen":
             try:
                 existing = sb.table("respondents").select("id").eq("training_id", training["id"]).eq("email", email.strip().lower()).execute().data
                 if existing:
-                    st.error("Email ini sudah pernah mengisi asesmen untuk training ini. Gunakan menu **Unduh Hasil Saya**.")
+                    st.error("Email ini sudah pernah mengisi asesmen untuk training ini. Silakan hubungi trainer/admin untuk mengambil laporan Anda.")
                     st.stop()
                 ins = sb.table("respondents").insert(dict(
                     training_id=training["id"], full_name=name.strip(),
@@ -220,204 +220,6 @@ if page == "📝 Mulai Asesmen":
                 show_result(name.strip(), training["name"], dept, job_level, scores)
             except Exception as e:
                 st.error(f"Gagal menyimpan: {e}")
-
-# ============================== PAGE: UNDUH HASIL ==============================
-elif page == "⬇️ Unduh Hasil Saya":
-    st.title("Unduh Hasil Asesmen")
-    trainings = fetch_trainings()
-    if not trainings:
-        st.warning("Belum ada training terdaftar.")
-        st.stop()
-    tname = st.selectbox("Perusahaan / Training", [t["name"] for t in trainings])
-    training = next(t for t in trainings if t["name"] == tname)
-    email = st.text_input("Email yang digunakan saat mengisi")
-    if st.button("🔍 Cari Hasil", type="primary"):
-        res = sb.table("respondents").select("*").eq("training_id", training["id"]).eq("email", email.strip().lower()).execute().data
-        if not res:
-            st.error("Data tidak ditemukan. Pastikan email dan training sudah benar.")
-        else:
-            resp = res[0]
-            rows = sb.table("responses").select("*").eq("respondent_id", resp["id"]).execute().data
-            scores = compute_dim_scores(responses_to_answers(rows))
-            if not scores:
-                st.error("Data jawaban belum lengkap. Hubungi admin.")
-            else:
-                show_result(resp["full_name"], training["name"], resp.get("department"), resp.get("job_level"), scores)
-
-
-# ============================== PAGE: UJIAN ==============================
-elif page == "🎓 Ujian Sertifikasi":
-    st.title("🎓 Ujian Sertifikasi")
-    st.caption("40 soal pilihan ganda (studi kasus) - nilai kelulusan 70 "
-               "(minimal 28 benar) - boleh mengulang sampai lulus.")
-
-    trainings = fetch_trainings()
-    if not trainings:
-        st.warning("Belum ada training terdaftar.")
-        st.stop()
-    tname = st.selectbox("Pilih Perusahaan / Training", [t["name"] for t in trainings], key="exam_t")
-    training = next(t for t in trainings if t["name"] == tname)
-
-    pkg_names = {k: v["title"] for k, v in EXAM_PACKAGES.items()}
-    pkg_key = st.selectbox("Pilih Paket Ujian", list(EXAM_PACKAGES.keys()),
-                           format_func=lambda k: pkg_names[k], key="exam_pkg")
-    pkg = EXAM_PACKAGES[pkg_key]
-    EXAM_QUESTIONS = pkg["questions"]
-    SESSION_NAMES = pkg["sessions"]
-    PASSING_SCORE = pkg["passing"]
-    st.caption(f"Paket: **{pkg['title']}** - kelulusan minimal **{PASSING_SCORE}** "
-               f"({round(PASSING_SCORE/100*40)} benar dari 40 soal)")
-
-    if training.get("access_code") and st.session_state.get("exam_ok") != training["id"]:
-        code = st.text_input("Kode akses", type="password", key="exam_code")
-        cbtn, _ = st.columns([1, 3])
-        if cbtn.button("🔓 Masuk ke Ujian", type="primary", use_container_width=True):
-            if code == training["access_code"]:
-                st.session_state["exam_ok"] = training["id"]
-                st.rerun()
-            else:
-                st.error("Kode akses salah.")
-        st.stop()
-
-    # ---- tampilkan hasil bila sudah ujian ----
-    if "exam_result" in st.session_state:
-        r = st.session_state["exam_result"]
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Nilai", f"{r['score']}")
-        c2.metric("Benar", f"{r['correct']} / 40")
-        c3.metric("Status", "LULUS ✅" if r["passed"] else "BELUM LULUS ❌")
-        if r["passed"]:
-            st.success(f"Selamat, **{r['name']}**! Anda dinyatakan LULUS Ujian Sertifikasi.")
-            st.balloons()
-        else:
-            st.error(f"Nilai Anda {r['score']} - belum mencapai {PASSING_SCORE}. "
-                     "Pelajari kembali materi, lalu ulangi ujian. Boleh mengulang tanpa batas.")
-        st.divider()
-        st.subheader("📋 Review Jawaban")
-        for q in EXAM_PACKAGES[r["pkg"]]["questions"]:
-            ua = r["answers"].get(q["n"])
-            ok = ua == q["key"]
-            label = f"{'✅' if ok else '❌'} Soal {q['n']} - {'Benar' if ok else 'Salah'}"
-            with st.expander(label):
-                st.markdown(f"**{q['q']}**")
-                for i, opt in enumerate(q["opts"]):
-                    mark = ""
-                    if i == q["key"]:
-                        mark = "  ✅ **(kunci)**"
-                    if ua is not None and i == ua and not ok:
-                        mark = "  ❌ **(jawaban Anda)**"
-                    st.markdown(f"- {chr(65+i)}. {opt}{mark}")
-        st.divider()
-        _wrong = [q["n"] for q in EXAM_PACKAGES[r["pkg"]]["questions"]
-                  if r["answers"].get(q["n"]) != q["key"]]
-        cc1, cc2, cc3 = st.columns(3)
-        if not r["passed"] and _wrong:
-            if cc1.button(f"🎯 Ulangi {len(_wrong)} Soal Salah",
-                          type="primary", use_container_width=True):
-                st.session_state["exam_retry"] = dict(
-                    pkg=r["pkg"], wrong=_wrong, name=r["name"], email=r.get("email", ""),
-                    keep=r["correct"], prev=dict(r["answers"]))
-                del st.session_state["exam_result"]
-                st.rerun()
-        if cc2.button("🔁 Ulang Semua (40 Soal)", use_container_width=True):
-            del st.session_state["exam_result"]
-            st.rerun()
-        if cc3.button("Selesai", use_container_width=True):
-            del st.session_state["exam_result"]
-            st.info("Terima kasih. Sertifikat fisik/digital akan diberikan oleh trainer Anda.")
-        st.stop()
-
-    # ---- MODE PERBAIKAN: hanya soal yang salah ----
-    if "exam_retry" in st.session_state:
-        rz = st.session_state["exam_retry"]
-        rpkg = EXAM_PACKAGES[rz["pkg"]]
-        rq = [q for q in rpkg["questions"] if q["n"] in rz["wrong"]]
-        PASSING_SCORE = rpkg["passing"]
-        st.info(f"🎯 **Mode Perbaikan** - {len(rq)} soal yang sebelumnya salah. "
-                f"Benar sebelumnya: {rz['keep']}/40. Jawab ulang, lalu kumpulkan.")
-        answers_r = {}
-        _by_sess = {}
-        for q in rq:
-            _by_sess.setdefault(q["session"], []).append(q)
-        for s in sorted(_by_sess, key=lambda k: int(k)):
-            qs_r = _by_sess[s]
-            with st.expander(f"**{rpkg['sessions'][str(s)]}** ({len(qs_r)} soal)",
-                             expanded=(s == sorted(_by_sess, key=lambda k: int(k))[0])):
-                for q in qs_r:
-                    opts = [f"{chr(65+i)}. {o}" for i, o in enumerate(q["opts"])]
-                    val = st.radio(f"**{q['n']}.** {q['q']}", opts, key=f"retry_q{q['n']}", index=None)
-                    if val is not None:
-                        answers_r[q["n"]] = ord(val[0]) - 65
-        answered_r = len(answers_r)
-        st.progress(answered_r / len(rq), text=f"Terjawab: {answered_r}/{len(rq)}")
-        if st.button("✅ Kumpulkan Perbaikan", type="primary", use_container_width=True):
-            if answered_r < len(rq):
-                st.error(f"Masih ada {len(rq) - answered_r} soal belum dijawab.")
-            else:
-                benar_r = sum(1 for q in rq if answers_r.get(q["n"]) == q["key"])
-                total_correct = rz["keep"] + benar_r
-                score = round(total_correct / 40 * 100)
-                passed = score >= PASSING_SCORE
-                try:
-                    sb.table("exam_attempts").insert(dict(
-                        training_id=training["id"], full_name=rz["name"],
-                        email=rz["email"], correct=total_correct,
-                        score=score, passed=passed, package=rz["pkg"])).execute()
-                except Exception:
-                    pass
-                merged = dict(rz["prev"]); merged.update(answers_r)
-                st.session_state["exam_result"] = dict(
-                    name=rz["name"], email=rz["email"], answers=merged,
-                    correct=total_correct, score=score, passed=passed, pkg=rz["pkg"])
-                del st.session_state["exam_retry"]
-                st.rerun()
-        st.stop()
-
-    # ---- biodata ----
-    st.divider()
-    st.subheader("Data Peserta Ujian")
-    c1, c2 = st.columns(2)
-    name = c1.text_input("Nama lengkap", key="exam_name")
-    email = c2.text_input("Email", key="exam_email")
-    if not name.strip() or not email.strip():
-        st.warning("Lengkapi nama dan email untuk mulai ujian.")
-        st.stop()
-
-    # ---- soal ----
-    st.divider()
-    st.subheader("Soal Ujian")
-    answers = {}
-    _sesi_list = sorted(SESSION_NAMES, key=lambda k: int(k))  # kunci sesi berupa string di JSON
-    for s in _sesi_list:
-        _qs = [x for x in EXAM_QUESTIONS if x["session"] == int(s)]
-        with st.expander(f"**{SESSION_NAMES[s]}** (Soal {_qs[0]['n']}-{_qs[-1]['n']})",
-                         expanded=(s == _sesi_list[0])):
-            for q in _qs:
-                opts = [f"{chr(65+i)}. {o}" for i, o in enumerate(q["opts"])]
-                val = st.radio(f"**{q['n']}.** {q['q']}", opts, key=f"exam_q{q['n']}", index=None)
-                if val is not None:
-                    answers[q["n"]] = ord(val[0]) - 65
-    answered = len(answers)
-    st.progress(answered / 40, text=f"Terjawab: {answered}/40")
-    if st.button("✅ Kumpulkan Jawaban", type="primary", use_container_width=True):
-        if answered < 40:
-            st.error(f"Masih ada {40 - answered} soal belum dijawab.")
-        else:
-            correct = sum(1 for q in EXAM_QUESTIONS if answers.get(q["n"]) == q["key"])
-            score = round(correct / 40 * 100)
-            passed = score >= PASSING_SCORE
-            try:
-                sb.table("exam_attempts").insert(dict(
-                    training_id=training["id"], full_name=name.strip(),
-                    email=email.strip().lower(), correct=correct,
-                    score=score, passed=passed, package=pkg_key)).execute()
-            except Exception:
-                pass  # tabel belum ada pun ujian tetap jalan
-            st.session_state["exam_result"] = dict(
-                name=name.strip(), email=email.strip().lower(), answers=answers,
-                correct=correct, score=score, passed=passed, pkg=pkg_key)
-            st.rerun()
-
 
 # ============================== PAGE: TRAINER BEI ==============================
 elif page == "👨‍⚕️ Menu Trainer (BEI)":
@@ -467,11 +269,17 @@ elif page == "👨‍⚕️ Menu Trainer (BEI)":
             with st.spinner("Menyimpan dan memproses dengan AI..."):
                 api_key = st.secrets.get("GEMINI_API_KEY", None)
                 structured = structure_bei(narratives, api_key)
-                sb.table("bei_sessions").insert(dict(
-                    training_id=training["id"], participant_name=p_name.strip(),
-                    counselor_name=counselor.strip(),
-                    narratives=json.dumps(narratives, ensure_ascii=False),
-                    structured=json.dumps(structured, ensure_ascii=False) if structured else None)).execute()
+                try:
+                    sb.table("bei_sessions").insert(dict(
+                        training_id=training["id"], participant_name=p_name.strip(),
+                        counselor_name=counselor.strip(),
+                        narratives=narratives,
+                        structured=structured)).execute()
+                except Exception as ex:
+                    st.error("Gagal menyimpan sesi ke database. Kemungkinan tabel bei_sessions "
+                             "belum dibuat - jalankan migrasi SQL (lihat panduan) lalu coba lagi. "
+                             f"Detail: {ex}")
+                    st.stop()
             st.success("Sesi tersimpan.")
             st.session_state["bei_last"] = (p_name.strip(), dict(narratives), structured)
             st.rerun()
@@ -744,7 +552,7 @@ else:
         trainings = fetch_trainings()
         if trainings:
             disp = pd.DataFrame(trainings)
-            disp["asesmen_aktif"] = disp.apply(lambda r: ", ".join(k for k in ALL_KEYS if k in get_enabled(r)), axis=1)
+            disp["asesmen_aktif"] = disp.apply(lambda r: ", ".join(INST_SHORT[k] for k in ALL_KEYS if k in get_enabled(r)), axis=1)
             st.dataframe(disp[["name", "access_code", "asesmen_aktif"]], hide_index=True, use_container_width=True)
         else:
             st.info("Belum ada training.")

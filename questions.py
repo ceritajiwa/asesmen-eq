@@ -7,7 +7,7 @@ Untuk menambah paket baru: tambahkan entri baru di EXAM_PACKAGES."""
 EXAM_PACKAGES = {
  "CERC": {
   "title": "Ujian Sertifikasi CERC (Emotional Regulation)",
-  "passing": 75,
+  "passing": 70,
   "sessions": {
    "1": "Sesi 1 - Psychological Safety Foundations",
    "2": "Sesi 2 - Regulasi Emosi & Self-Mastery",
@@ -499,7 +499,7 @@ EXAM_PACKAGES = {
  },
  "CBT": {
   "title": "Ujian Sertifikasi CBT + Counseling",
-  "passing": 75,
+  "passing": 70,
   "sessions": {
    "1": "Sesi 1 - Foundations of CBT & Counseling",
    "2": "Sesi 2 - The Cognitive Model & Thought Records",
@@ -995,4 +995,4 @@ EXAM_PACKAGES = {
  }
 }
 
-PASSING_SCORE = 75  # default; tiap paket punya 'passing' sendiri
+PASSING_SCORE = 70  # default; tiap paket punya 'passing' sendiri
