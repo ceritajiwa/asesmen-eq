@@ -51,7 +51,7 @@ GEMINI_URL = ("https://generativelanguage.googleapis.com/v1beta/models/"
 def structure_bei(narratives: dict, api_key: str | None) -> dict:
     """Kirim narasi ke Gemini -> dict terstruktur. Tanpa key: return None."""
     if not api_key:
-        return None
+        return {"_error": "GEMINI_API_KEY tidak ditemukan di Secrets Streamlit."}
     import requests
     joined = "\n\n".join(f"### {k}\n{v}" for k, v in narratives.items() if str(v).strip())
     prompt = (
@@ -65,11 +65,20 @@ def structure_bei(narratives: dict, api_key: str | None) -> dict:
                           json={"contents": [{"parts": [{"text": prompt}]}],
                                 "generationConfig": {"responseMimeType": "application/json",
                                                      "temperature": 0.3}},
-                          timeout=60)
-        text = r.json()["candidates"][0]["content"]["parts"][0]["text"]
-        return json.loads(text)
+                          timeout=90)
+        if r.status_code != 200:
+            return {"_error": f"Gemini API menolak (status {r.status_code}): {r.text[:250]}"}
+        text = r.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+        if text.startswith("```"):
+            text = text.strip("`")
+            if text.lower().startswith("json"):
+                text = text[4:]
+        parsed = json.loads(text)
+        if not isinstance(parsed, dict) or not parsed:
+            return {"_error": "Respons AI kosong/bukan objek JSON."}
+        return parsed
     except Exception as e:
-        return {"ringkasan": f"(AI gagal memproses: {e})"}
+        return {"_error": f"Gagal memproses respons AI: {e}"}
 
 def fetch_bei(sb, training_id):
     try:

@@ -288,11 +288,16 @@ elif page == "👨‍⚕️ Menu Trainer (BEI)":
         ln, lnar, lstc = st.session_state.pop("bei_last")
         st.divider()
         st.subheader(f"📋 Hasil Terstruktur - {ln}")
-        if lstc:
+        if lstc and lstc.get("_error"):
+            st.error("⚠️ AI tidak dapat memproses sesi ini:")
+            st.code(lstc["_error"])
+            st.info("Narasi sesi TETAP TERSIMPAN di database. Perbaiki penyebab di atas "
+                    "(paling umum: GEMINI_API_KEY belum/belum benar diisi di Secrets, "
+                    "atau API Gemini belum diaktifkan untuk key tersebut).")
+        elif lstc:
             st.dataframe(_struct_table(lstc), hide_index=True, use_container_width=True)
         else:
-            st.info("Struktur AI kosong (GEMINI_API_KEY belum diisi di Secrets, atau proses gagal). "
-                    "Narasi tetap tersimpan; isi GEMINI_API_KEY lalu sesi berikutnya akan diproses.")
+            st.info("Struktur AI kosong. Narasi tetap tersimpan.")
         pdf_b = bei_participant_pdf(tname, ln, counselor, lnar, lstc)
         st.download_button("⬇️ Download PDF Sesi Ini", data=pdf_b,
                            file_name=f"BEI_{ln.replace(' ','_')}.pdf", mime="application/pdf")
