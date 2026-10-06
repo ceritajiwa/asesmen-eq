@@ -83,6 +83,13 @@ def structure_bei(narratives: dict, api_key: str | None) -> dict:
                 if m and m.group(1) not in tried and m.group(1) not in todo:
                     todo.insert(0, m.group(1))
                 continue
+            if r.status_code in (429, 503):
+                # sibuk/sekarat sementara: coba model kandidat lain, dan
+                # masukkan ulang model ini di urutan belakang untuk dicoba lagi
+                todo.append(model)
+                import time as _t
+                _t.sleep(3)
+                continue
             if r.status_code != 200:
                 return {"_error": f"Gemini API menolak (status {r.status_code}, model {model}): {r.text[:250]}"}
             text = r.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
