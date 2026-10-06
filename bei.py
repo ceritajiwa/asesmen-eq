@@ -86,11 +86,17 @@ def structure_bei(narratives: dict, api_key: str | None) -> dict:
         "Setiap value berupa string Bahasa Indonesia yang ringkas dan profesional (maks 3 kalimat). "
         "Jangan tambahkan key lain, jangan markdown.\n\n" + joined)
     tried = []
-    todo = _available_flash_models(api_key) or list(MODEL_CANDIDATES)
-    for _attempt in range(6):  # batasi jumlah percobaan
+    todo = _available_flash_models(api_key)
+    if not todo:
+        return {"_error": "Gagal mengambil daftar model dari Google (endpoint v1beta/models). "
+                          "Key mungkin benar tapi Generative Language API belum diaktifkan di project Google Cloud-nya."}
+    last_err = ""
+    for _attempt in range(5):
         if not todo:
             break
         model = todo.pop(0)
+        if model in tried:
+            continue
         tried.append(model)
         try:
             r = requests.post(f"{GEMINI_BASE}{model}:generateContent", params={"key": api_key},
@@ -99,21 +105,16 @@ def structure_bei(narratives: dict, api_key: str | None) -> dict:
                                                          "temperature": 0.3}},
                               timeout=90)
             if r.status_code == 404:
-                # coba baca nama model yang disarankan Google dari pesan error
-                import re as _re
-                m = _re.search(r"models/([\w.\-]+)", r.text)
-                if m and m.group(1) not in tried and m.group(1) not in todo:
-                    todo.insert(0, m.group(1))
+                last_err = f"[{model} 404] {r.text[:180]}"
                 continue
             if r.status_code in (429, 503):
-                # sibuk/sekarat sementara: coba model kandidat lain, dan
-                # masukkan ulang model ini di urutan belakang untuk dicoba lagi
+                last_err = f"[{model} {r.status_code}] sibuk sementara"
                 todo.append(model)
                 import time as _t
-                _t.sleep(3)
+                _t.sleep(2)
                 continue
             if r.status_code != 200:
-                return {"_error": f"Gemini API menolak (status {r.status_code}, model {model}): {r.text[:250]}"}
+                return {"_error": f"Gemini menolak (status {r.status_code}, model {model}): {r.text[:250]}"}
             text = r.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
             if text.startswith("```"):
                 text = text.strip("`")
@@ -125,8 +126,9 @@ def structure_bei(narratives: dict, api_key: str | None) -> dict:
             return parsed
         except Exception as e:
             return {"_error": f"Gagal memproses respons AI (model {model}): {e}"}
-    return {"_error": f"Semua kandidat model gagal (404). Dicoba: {', '.join(tried)}. "
-                      f"Buka aistudio.google.com untuk melihat model terbaru."}
+    return {"_error": "Semua model gagal. Model tersedia dari Google: "
+                      + ", ".join(tried[:10])
+                      + (" | Terakhir: " + last_err if last_err else "")}
 
 def fetch_bei(sb, training_id):
     try:
