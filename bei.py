@@ -45,8 +45,11 @@ STRUCT_FIELDS = [
     ("ringkasan", "Ringkasan Kasus"),
 ]
 
-GEMINI_URL = ("https://generativelanguage.googleapis.com/v1beta/models/"
-              "gemini-2.0-flash:generateContent")
+GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models/"
+
+# urutan kandidat model (paling baru dulu); + auto-parse nama model
+# dari pesan error Google ("Please update your code to use models/xxx")
+MODEL_CANDIDATES = ["gemini-3.8-flash", "gemini-flash", "gemini-2.5-flash", "gemini-3.8-flash-latest"]
 
 def structure_bei(narratives: dict, api_key: str | None) -> dict:
     """Kirim narasi ke Gemini -> dict terstruktur. Tanpa key: return None."""
@@ -60,25 +63,41 @@ def structure_bei(narratives: dict, api_key: str | None) -> dict:
         "prioritas (angka 1-5), rekomendasi_peserta, rekomendasi_perusahaan, ringkasan. "
         "Setiap value berupa string Bahasa Indonesia yang ringkas dan profesional (maks 3 kalimat). "
         "Jangan tambahkan key lain, jangan markdown.\n\n" + joined)
-    try:
-        r = requests.post(GEMINI_URL, params={"key": api_key},
-                          json={"contents": [{"parts": [{"text": prompt}]}],
-                                "generationConfig": {"responseMimeType": "application/json",
-                                                     "temperature": 0.3}},
-                          timeout=90)
-        if r.status_code != 200:
-            return {"_error": f"Gemini API menolak (status {r.status_code}): {r.text[:250]}"}
-        text = r.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
-        if text.startswith("```"):
-            text = text.strip("`")
-            if text.lower().startswith("json"):
-                text = text[4:]
-        parsed = json.loads(text)
-        if not isinstance(parsed, dict) or not parsed:
-            return {"_error": "Respons AI kosong/bukan objek JSON."}
-        return parsed
-    except Exception as e:
-        return {"_error": f"Gagal memproses respons AI: {e}"}
+    tried = []
+    todo = list(MODEL_CANDIDATES)
+    for _attempt in range(6):  # batasi jumlah percobaan
+        if not todo:
+            break
+        model = todo.pop(0)
+        tried.append(model)
+        try:
+            r = requests.post(f"{GEMINI_BASE}{model}:generateContent", params={"key": api_key},
+                              json={"contents": [{"parts": [{"text": prompt}]}],
+                                    "generationConfig": {"responseMimeType": "application/json",
+                                                         "temperature": 0.3}},
+                              timeout=90)
+            if r.status_code == 404:
+                # coba baca nama model yang disarankan Google dari pesan error
+                import re as _re
+                m = _re.search(r"models/([\w.\-]+)", r.text)
+                if m and m.group(1) not in tried and m.group(1) not in todo:
+                    todo.insert(0, m.group(1))
+                continue
+            if r.status_code != 200:
+                return {"_error": f"Gemini API menolak (status {r.status_code}, model {model}): {r.text[:250]}"}
+            text = r.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+            if text.startswith("```"):
+                text = text.strip("`")
+                if text.lower().startswith("json"):
+                    text = text[4:]
+            parsed = json.loads(text)
+            if not isinstance(parsed, dict) or not parsed:
+                return {"_error": "Respons AI kosong/bukan objek JSON."}
+            return parsed
+        except Exception as e:
+            return {"_error": f"Gagal memproses respons AI (model {model}): {e}"}
+    return {"_error": f"Semua kandidat model gagal (404). Dicoba: {', '.join(tried)}. "
+                      f"Buka aistudio.google.com untuk melihat model terbaru."}
 
 def fetch_bei(sb, training_id):
     try:
