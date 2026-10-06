@@ -16,7 +16,7 @@ from charts import (radar_chart, bar_chart_targets, dept_chart, cluster_donut,
                     index_heatmap, band_distribution_chart, action_map_chart, dims_heatmap)
 from pdf_report import individual_pdf, company_pdf
 from questions import EXAM_PACKAGES
-from bei import (BEI_PROMPTS, STRUCT_FIELDS, structure_bei, bei_participant_pdf, bei_company_pdf, fetch_bei)
+from bei import (BEI_PROMPTS, STRUCT_FIELDS, structure_bei, bei_participant_pdf, bei_company_pdf, fetch_bei, _struct_table)
 
 st.set_page_config(page_title="Asesmen EQ | Cerita Jiwa", page_icon="🧠", layout="wide")
 
