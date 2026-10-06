@@ -302,6 +302,34 @@ elif page == "👨‍⚕️ Menu Trainer (BEI)":
         st.download_button("⬇️ Download PDF Sesi Ini", data=pdf_b,
                            file_name=f"BEI_{ln.replace(' ','_')}.pdf", mime="application/pdf")
 
+
+    st.divider()
+    st.subheader("📚 Riwayat Sesi Tersimpan")
+    _sessions = fetch_bei(sb, training["id"])
+    if not _sessions:
+        st.info("Belum ada sesi tersimpan untuk training ini.")
+    else:
+        st.caption(f"{len(_sessions)} sesi ditemukan.")
+        for s in _sessions:
+            _stc = json.loads(s["structured"]) if s.get("structured") else None
+            _nar = json.loads(s.get("narratives") or "{}")
+            with st.expander(f"**{s['participant_name']}** - {s.get('counselor_name','-')} "
+                             f"({str(s.get('created_at',''))[:10]})"):
+                if _stc and _stc.get("_error"):
+                    st.warning(f"AI: {_stc['_error'][:200]}")
+                elif _stc:
+                    st.dataframe(_struct_table(_stc), hide_index=True, use_container_width=True)
+                st.markdown("**Catatan narasi:**")
+                for _k, _t, _ in BEI_PROMPTS:
+                    _v = (_nar or {}).get(_k, "").strip()
+                    if _v:
+                        st.markdown(f"- **{_t}:** {_v[:300]}")
+                _pdf = bei_participant_pdf(tname, s["participant_name"],
+                                           s.get("counselor_name", "-"), _nar or {}, _stc)
+                st.download_button("⬇️ PDF Sesi Ini", data=_pdf,
+                                   file_name=f"BEI_{s['participant_name'].replace(' ','_')}_{str(s.get('created_at',''))[:10]}.pdf",
+                                   mime="application/pdf", key=f"bei_hist_{s['id']}")
+
 # ============================== PAGE: ADMIN ==============================
 else:
     st.title("🔐 Area Admin")
