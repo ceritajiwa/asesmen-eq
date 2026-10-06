@@ -289,7 +289,7 @@ elif page == "👨‍⚕️ Menu Trainer (BEI)":
         else:
             with st.spinner("Menyimpan dan memproses dengan AI..."):
                 api_key = st.secrets.get("GEMINI_API_KEY", None)
-                structured = structure_bei(narratives, api_key)
+                structured = structure_bei(narratives, api_key, st.secrets.get("GROQ_API_KEY", None))
                 _lid = st.session_state.pop("bei_loaded_id", None)
                 try:
                     if _lid:

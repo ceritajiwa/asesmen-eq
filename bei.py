@@ -73,7 +73,60 @@ def _available_flash_models(api_key):
     except Exception:
         return []
 
-def structure_bei(narratives: dict, api_key: str | None) -> dict:
+
+
+GROQ_BASE = "https://api.groq.com/openai/v1"
+GROQ_FALLBACK_MODELS = ["llama-3.3-70b-versatile", "openai/gpt-oss-120b", "llama-3.1-8b-instant"]
+
+def _groq_models(api_key):
+    """Daftar model chat Groq yang tersedia untuk key ini (versi besar dulu)."""
+    try:
+        import requests as _rq
+        r = _rq.get(f"{GROQ_BASE}/models", headers={"Authorization": f"Bearer {api_key}"}, timeout=30)
+        if r.status_code != 200:
+            return []
+        ids = [m.get("id", "") for m in r.json().get("data", [])]
+        chat = [i for i in ids if not any(x in i for x in ("whisper", "guard", "tts", "audio"))]
+        big = [i for i in chat if any(x in i for x in ("70b", "120b", "405b", "3.3", "gpt-oss"))]
+        rest = [i for i in chat if i not in big]
+        return big + rest
+    except Exception:
+        return []
+
+def _structure_with_groq(prompt, api_key):
+    """Coba Groq satu per satu; kembalikan (hasil_dict, None) atau (None, status_str)."""
+    import requests as _rq
+    todo = _groq_models(api_key) or list(GROQ_FALLBACK_MODELS)
+    statuses = []
+    for model in todo[:6]:
+        try:
+            r = _rq.post(f"{GROQ_BASE}/chat/completions",
+                         headers={"Authorization": f"Bearer {api_key}"},
+                         json={"model": model,
+                               "messages": [{"role": "user", "content": prompt}],
+                               "response_format": {"type": "json_object"},
+                               "temperature": 0.3},
+                         timeout=90)
+            if r.status_code in (429, 503):
+                statuses.append(f"{model}: sibuk")
+                continue
+            if r.status_code != 200:
+                statuses.append(f"{model}: {r.status_code} {r.text[:120]}")
+                continue
+            text = r.json()["choices"][0]["message"]["content"].strip()
+            if text.startswith("```"):
+                text = text.strip("`")
+                if text.lower().startswith("json"):
+                    text = text[4:]
+            parsed = json.loads(text)
+            if isinstance(parsed, dict) and parsed:
+                return parsed, None
+            statuses.append(f"{model}: JSON kosong")
+        except Exception as e:
+            statuses.append(f"{model}: {e}")
+    return None, " | ".join(statuses[:8]) or "tidak ada model Groq yang bisa dicoba"
+
+def structure_bei(narratives: dict, api_key: str | None, groq_key: str | None = None) -> dict:
     """Kirim narasi ke Gemini -> dict terstruktur. Tanpa key: return None."""
     if not api_key:
         return {"_error": "GEMINI_API_KEY tidak ditemukan di Secrets Streamlit."}
@@ -142,7 +195,16 @@ def structure_bei(narratives: dict, api_key: str | None) -> dict:
         tried.append(model)
         if _per_model:
             statuses.append(f"{model}: {', '.join(_per_model)}")
-    return {"_error": "Semua model gagal/sibuk. Status: " + " | ".join(statuses[:12])}
+    # ---- fallback: Groq ----
+    if groq_key:
+        import streamlit as _st
+        _groq_res, _groq_err = _structure_with_groq(prompt, groq_key)
+        if _groq_res:
+            return _groq_res
+        return {"_error": "Gemini gagal/sibuk. Groq juga gagal. "
+                          f"[Gemini: {' | '.join(statuses[:8])}] [Groq: {_groq_err}]"}
+    return {"_error": "Semua model Gemini gagal/sibuk (dan GROQ_API_KEY belum diisi). Status: "
+                      + " | ".join(statuses[:12])}
 
 def fetch_bei(sb, training_id):
     try:
