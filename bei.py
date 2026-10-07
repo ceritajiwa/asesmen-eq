@@ -105,7 +105,8 @@ def _structure_with_groq(prompt, api_key):
                          json={"model": model,
                                "messages": [{"role": "user", "content": prompt}],
                                "response_format": {"type": "json_object"},
-                               "temperature": 0.3},
+                               "temperature": 0.3,
+                               "max_tokens": 4096},
                          timeout=90)
             if r.status_code in (429, 503):
                 statuses.append(f"{model}: sibuk")
@@ -133,11 +134,29 @@ def structure_bei(narratives: dict, api_key: str | None, groq_key: str | None = 
     import requests
     joined = "\n\n".join(f"### {k}\n{v}" for k, v in narratives.items() if str(v).strip())
     prompt = (
-        "Anda adalah asisten psikolog industri. Berikut catatan narasatif sesi konseling BEI dari konselor. "
-        "Susun menjadi SATU objek JSON dengan key persis: domain, kekuatan, area_rawan, pemicu, risiko, "
-        "prioritas (angka 1-5), rekomendasi_peserta, rekomendasi_perusahaan, ringkasan. "
-        "Setiap value berupa string Bahasa Indonesia yang ringkas dan profesional (maks 3 kalimat). "
-        "Jangan tambahkan key lain, jangan markdown.\n\n" + joined)
+        "Anda adalah asisten psikolog industri yang membantu konselor merapikan catatan sesi (BEI) menjadi "
+        "laporan terstruktur. Berikut catatan narasatifnya.\n\n"
+        + joined
+        + "\n\nSusun menjadi SATU objek JSON dengan key persis: domain, kekuatan, area_rawan, pemicu, "
+        "risiko, prioritas (angka 1-5), rekomendasi_peserta, rekomendasi_perusahaan, ringkasan.\n"
+        "Aturan penulisan value:\n"
+        "1. Bahasa Indonesia manusiawi dan profesional - seperti psikolog berpengalaman menulis laporan untuk "
+        "HR dan manajemen, BUKAN kalimat telegram.\n"
+        "2. Setiap value terdiri dari 3-6 kalimat yang utuh: jelaskan apa yang terjadi, mengapa itu penting, "
+        "dan implikasinya. Hindari jargon kecuali istilah yang memang standar.\n"
+        "3. 'domain': klasifikasi utama kasus (misal: Kinerja & Produktivitas / Kesejahteraan & Retensi / "
+        "Relasi & Komunikasi / Karir & Pengembangan / Kesehatan Mental / Lainnya) plus alasan singkat.\n"
+        "4. 'kekuatan': kekuatan dan sumber daya peserta yang terlihat, plus bagaimana bisa dimanfaatkan.\n"
+        "5. 'area_rawan': pola atau kondisi yang perlu perhatian, dijelaskan dengan konteksnya.\n"
+        "6. 'pemicu': faktor pemicu/penguat yang teridentifikasi, bukan sekadar daftar.\n"
+        "7. 'risiko': konsekuensi realistis jika tidak ditangani, ditulis untuk audience bisnis.\n"
+        "8. 'rekomendasi_peserta': langkah konkret untuk peserta (bukan sekadar 'konseling' - jelaskan "
+        "arah dan tujuannya), ditulis dengan bahasa yang membuat peserta merasa didukung, bukan dihakimi.\n"
+        "9. 'rekomendasi_perusahaan': langkah konkret untuk perusahaan/HR, fleksibel untuk konteks apapun "
+        "(rekrutmen, promosi, retensi, atau pengembangan karyawan).\n"
+        "10. 'ringkasan': gambaran utuh kasus dalam 4-6 kalimat, cocok dibaca manajemen yang tidak hadir di sesi.\n"
+        "11. 'prioritas': angka 1-5 (1 = bisa menunggu, 5 = sangat mendesak) dengan pertimbangan klinis dan bisnis.\n"
+        "Jangan tambahkan key lain. Jangan gunakan markdown. Murni JSON.")
     tried = []
     todo = _available_flash_models(api_key)
     if not todo:
