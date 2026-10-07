@@ -1,6 +1,7 @@
 
 # -*- coding: utf-8 -*-
 import io, json, random, zipfile
+from datetime import datetime
 import streamlit as st
 import pandas as pd
 from supabase import create_client
@@ -16,7 +17,7 @@ from charts import (radar_chart, bar_chart_targets, dept_chart, cluster_donut,
                     index_heatmap, band_distribution_chart, action_map_chart, dims_heatmap)
 from pdf_report import individual_pdf, company_pdf
 from questions import EXAM_PACKAGES
-from bei import (BEI_PROMPTS, STRUCT_FIELDS, structure_bei, bei_participant_pdf, bei_company_pdf, fetch_bei, _struct_table)
+from bei import (BEI_PROMPTS, STRUCT_FIELDS, structure_bei, bei_participant_pdf, bei_company_pdf, fetch_bei, _struct_table, bei_radar_png)
 
 def _jloads(v):
     if not v:
@@ -308,6 +309,7 @@ elif page == "👨‍⚕️ Menu Trainer (BEI)":
                     st.stop()
             st.success("Sesi tersimpan.")
             st.session_state["bei_last"] = (p_name.strip(), dict(narratives), structured)
+            st.session_state["bei_last_tanggal"] = datetime.now().strftime("%Y-%m-%d")
             st.rerun()
 
     if "bei_last" in st.session_state:
@@ -324,18 +326,24 @@ elif page == "👨‍⚕️ Menu Trainer (BEI)":
             st.dataframe(_struct_table(lstc), hide_index=True, use_container_width=True)
         else:
             st.info("Struktur AI kosong. Narasi tetap tersimpan.")
-        pdf_b = bei_participant_pdf(tname, ln, counselor, lnar, lstc)
+        if lstc and isinstance(lstc.get("skor_visual"), dict) and lstc["skor_visual"]:
+            st.image(bei_radar_png(lstc["skor_visual"]), width=380)
+        pdf_b = bei_participant_pdf(tname, ln, counselor, lnar, lstc,
+                                    tanggal=str(st.session_state.get("bei_last_tanggal", "")))
         st.download_button("⬇️ Download PDF Sesi Ini", data=pdf_b,
                            file_name=f"BEI_{ln.replace(' ','_')}.pdf", mime="application/pdf")
 
 
     st.divider()
     st.subheader("📚 Riwayat Sesi Tersimpan")
-    _sessions = fetch_bei(sb, training["id"])
+    _sessions_all = fetch_bei(sb, training["id"])
+    _sessions = [s for s in _sessions_all if s["participant_name"] == p_name] if p_name.strip() else _sessions_all
     if not _sessions:
-        st.info("Belum ada sesi tersimpan untuk training ini.")
+        st.info("Belum ada sesi tersimpan untuk peserta ini." if p_name.strip()
+                else "Belum ada sesi tersimpan untuk training ini.")
     else:
-        st.caption(f"{len(_sessions)} sesi ditemukan.")
+        st.caption(f"{len(_sessions)} sesi untuk **{p_name}**." if p_name.strip()
+                   else f"{len(_sessions)} sesi ditemukan (semua peserta).")
         for s in _sessions:
             _stc = _jloads(s.get("structured"))
             _nar = _jloads(s.get("narratives")) or {}
@@ -358,8 +366,11 @@ elif page == "👨‍⚕️ Menu Trainer (BEI)":
                     _v = (_nar or {}).get(_k, "").strip()
                     if _v:
                         st.markdown(f"- **{_t}:** {_v[:300]}")
+                if _stc and isinstance(_stc.get("skor_visual"), dict) and _stc["skor_visual"]:
+                    st.image(bei_radar_png(_stc["skor_visual"]), width=380)
                 _pdf = bei_participant_pdf(tname, s["participant_name"],
-                                           s.get("counselor_name", "-"), _nar or {}, _stc)
+                                           s.get("counselor_name", "-"), _nar or {}, _stc,
+                                           tanggal=str(s.get("created_at", "")))
                 st.download_button("⬇️ PDF Sesi Ini", data=_pdf,
                                    file_name=f"BEI_{s['participant_name'].replace(' ','_')}_{str(s.get('created_at',''))[:10]}.pdf",
                                    mime="application/pdf", key=f"bei_hist_{s['id']}")

@@ -138,7 +138,7 @@ def structure_bei(narratives: dict, api_key: str | None, groq_key: str | None = 
         "laporan terstruktur. Berikut catatan narasatifnya.\n\n"
         + joined
         + "\n\nSusun menjadi SATU objek JSON dengan key persis: domain, kekuatan, area_rawan, pemicu, "
-        "risiko, prioritas (angka 1-5), rekomendasi_peserta, rekomendasi_perusahaan, ringkasan.\n"
+        "risiko, prioritas (angka 1-5), rekomendasi_peserta, rekomendasi_perusahaan, ringkasan, skor_visual.\n"
         "Aturan penulisan value:\n"
         "1. Bahasa Indonesia manusiawi dan profesional - seperti psikolog berpengalaman menulis laporan untuk "
         "HR dan manajemen, BUKAN kalimat telegram.\n"
@@ -156,6 +156,9 @@ def structure_bei(narratives: dict, api_key: str | None, groq_key: str | None = 
         "(rekrutmen, promosi, retensi, atau pengembangan karyawan).\n"
         "10. 'ringkasan': gambaran utuh kasus dalam 4-6 kalimat, cocok dibaca manajemen yang tidak hadir di sesi.\n"
         "11. 'prioritas': angka 1-5 (1 = bisa menunggu, 5 = sangat mendesak) dengan pertimbangan klinis dan bisnis.\n"
+        "12. 'skor_visual': objek JSON berisi 4-6 aspek yang relevan dari narasi (contoh: Kesejahteraan, "
+        "Keterlibatan Kerja, Kestabilan Emosi, Relasi & Dukungan, Fungsi Peran) masing-masing dengan "
+        "angka estimasi 0-100 berdasarkan bukti di narasi - untuk digambar sebagai radar chart.\n"
         "Jangan tambahkan key lain. Jangan gunakan markdown. Murni JSON.")
     tried = []
     todo = _available_flash_models(api_key)
@@ -235,7 +238,38 @@ def _struct_table(structured):
     rows = [{"Aspek": label, "Hasil": structured.get(k, "-") or "-"} for k, label in STRUCT_FIELDS]
     return pd.DataFrame(rows)
 
-def bei_participant_pdf(training_name, p_name, counselor, narratives, structured):
+
+
+def bei_radar_png(skor: dict, title="Peta Aspek Sesi (estimasi AI dari narasi)", figsize=(6, 6)):
+    """Radar chart dari dict {aspek: 0-100} hasil analisis AI."""
+    import numpy as np
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    if not skor:
+        return None
+    labels = list(skor.keys())[:8]
+    vals = [min(100, max(0, float(skor[k]))) for k in labels]
+    N = len(labels)
+    ang = np.linspace(0, 2 * np.pi, N, endpoint=False).tolist()
+    vals_c = vals + vals[:1]; ang_c = ang + ang[:1]
+    fig, ax = plt.subplots(figsize=figsize, subplot_kw=dict(polar=True))
+    ax.plot(ang_c, vals_c, color="#5B4E9E", linewidth=2)
+    ax.fill(ang_c, vals_c, color="#5B4E9E", alpha=0.25)
+    ax.set_ylim(0, 100)
+    ax.set_xticks(ang); ax.set_xticklabels([l[:18] for l in labels], fontsize=9)
+    ax.set_yticks([20, 40, 60, 80, 100]); ax.set_yticklabels(["20", "40", "60", "80", "100"], fontsize=7, color="grey")
+    for a, v in zip(ang, vals):
+        ax.annotate(f"{v:.0f}", (a, v), textcoords="offset points", xytext=(0, 6),
+                    ha="center", fontsize=9, fontweight="bold", color="#5B4E9E")
+    ax.set_title(title, fontsize=11, fontweight="bold", pad=20)
+    fig.tight_layout()
+    import io as _io
+    buf = _io.BytesIO(); fig.savefig(buf, format="png", dpi=140, bbox_inches="tight")
+    plt.close(fig); buf.seek(0)
+    return buf.read()
+
+def bei_participant_pdf(training_name, p_name, counselor, narratives, structured, tanggal=None):
     pdf = BasePDF()
     pdf.company = training_name
     pdf.add_page()
@@ -245,13 +279,22 @@ def bei_participant_pdf(training_name, p_name, counselor, narratives, structured
     pdf.ln(2)
     pdf.set_font("helvetica", "", 10)
     for k, v in [("Peserta", p_name), ("Perusahaan / Training", training_name),
-                 ("Konselor / Trainer", counselor), ("Tanggal", datetime.now().strftime("%d %B %Y"))]:
+                 ("Konselor / Trainer", counselor),
+                 ("Tanggal Sesi", (tanggal or "")[:10] or datetime.now().strftime("%d %B %Y"))]:
         pdf.set_font("helvetica", "B", 10); pdf.cell(45, 6, _safe(k))
         pdf.set_font("helvetica", "", 10); pdf.cell(0, 6, _safe(str(v)), ln=1)
     pdf.ln(2)
     pdf.set_font("helvetica", "B", 12); pdf.set_text_color(91, 78, 158)
     pdf.cell(0, 8, "Hasil Terstruktur", ln=1)
     pdf.set_text_color(30, 30, 30)
+    _sv = (structured or {}).get("skor_visual") if isinstance(structured, dict) else None
+    if isinstance(_sv, dict) and _sv:
+        _png = bei_radar_png(_sv)
+        if _png:
+            _img(pdf, _png, x=62, w=88)
+            pdf.ln(2)
+            _cap(pdf, "Gambar: estimasi aspek hasil analisis AI atas narasi sesi (0-100).")
+            pdf.ln(2)
     if structured:
         pdf.set_font("helvetica", "", 9.5)
         for k, label in STRUCT_FIELDS:
