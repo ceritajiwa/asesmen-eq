@@ -34,10 +34,12 @@ def _img(pdf, png_bytes, **kw):
     except OSError: pass
 
 def _safe(s):
-    return (str(s).replace("**", "")
-            .replace("'", "'").replace("'", "'")
-            .replace(""", '"').replace(""", '"')
-            .replace("–", "-").replace("—", "-"))
+    s = (str(s).replace("**", "")
+         .replace("'", "'").replace("'", "'")
+         .replace(""", '"').replace(""", '"')
+         .replace("–", "-").replace("—", "-"))
+    # buang karakter di luar latin-1 (emoji/simbol unicode hasil AI, dsb)
+    return s.encode("latin-1", errors="replace").decode("latin-1")
 
 def _mc(pdf, text, h=5.5, size=None, style=""):
     if size: pdf.set_font("helvetica", style, size)
