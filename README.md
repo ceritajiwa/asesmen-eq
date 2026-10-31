@@ -7,10 +7,12 @@ Aplikasi Streamlit untuk asesmen, training, ujian, dan sertifikat Cerita Jiwa.
 ```
 app.py                  # entrypoint + daftar menu (st.navigation)
 views/                  # isi tiap halaman
-utils/db.py             # akses tabel training & kode akses di Supabase (atur nama tabel/kolom di sini)
-utils/ui.py             # form kode akses + data peserta (dipakai 4 halaman peserta)
-utils/auth.py           # session & cek password
-utils/styles.py         # tampilan (warna brand, font, komponen)
+cjlib/db.py             # semua akses ke Supabase
+cjlib/konten.py         # BANK SOAL asesmen & ujian (isi soal asli di sini)
+cjlib/pdf.py            # pembuat PDF laporan, sertifikat, dan badge
+cjlib/ui.py                # form kode akses + data peserta (dipakai 4 halaman peserta)
+cjlib/auth.py           # session & cek password
+cjlib/styles.py         # tampilan (warna brand, font, komponen)
 supabase/               # query bantu untuk cek struktur database
 ```
 
@@ -34,9 +36,10 @@ supabase/               # query bantu untuk cek struktur database
 | Tabel | Dipakai untuk |
 |---|---|
 | `trainings` | Daftar training & kode akses (`name`, `access_code`) |
-| `respondents` | Hitung total peserta di Admin |
-| `exam_attempts` | Riwayat ujian & status lulus di halaman Sertifikat, jumlah lulus di Admin |
-| `responses`, `bei_sessions` | Belum dipakai di versi ini |
+| `respondents` | Data peserta yang mengisi asesmen |
+| `exam_attempts` | Hasil ujian, status lulus, nomor sertifikat (CERC-2026-<id>) |
+| `responses` | Jawaban asesmen (per item) |
+| `bei_sessions` | Belum dipakai di versi ini |
 
 Aturan kode akses:
 - Training **dibuka** kalau `access_code` terisi, **ditutup** kalau kosong.

@@ -1,7 +1,7 @@
 import streamlit as st
 
-from utils.styles import footer, page_header
-from utils.ui import peserta_sidebar, require_peserta_gate, subjudul
+from cjlib.styles import footer, page_header
+from cjlib.ui import peserta_sidebar, require_peserta_gate, subjudul
 
 training, peserta = require_peserta_gate("🎓 Training")
 peserta_sidebar("training")

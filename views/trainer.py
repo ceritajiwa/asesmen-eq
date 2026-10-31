@@ -1,8 +1,8 @@
 import plotly.graph_objects as go
 import streamlit as st
 
-from utils.auth import check_password, is_trainer_logged_in
-from utils.styles import footer, page_header
+from cjlib.auth import check_password, is_trainer_logged_in
+from cjlib.styles import footer, page_header
 
 if not is_trainer_logged_in():
     _, mid, _ = st.columns([1, 2, 1])

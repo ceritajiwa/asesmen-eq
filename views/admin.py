@@ -1,14 +1,14 @@
 import pandas as pd
 import streamlit as st
 
-from utils.auth import check_password, is_admin_logged_in
-from utils.db import (
+from cjlib.auth import check_password, is_admin_logged_in
+from cjlib.db import (
     SERTIFIKASI_LIST, DatabaseError, create_training, format_tanggal, get_trainings,
     hitung_statistik, set_kode_akses, training_label,
 )
-from utils.styles import footer, page_header
-from utils.supabase_client import SupabaseNotConfigured
-from utils.ui import show_db_error
+from cjlib.styles import footer, page_header
+from cjlib.supabase_client import SupabaseNotConfigured
+from cjlib.ui import show_db_error
 
 # ---------------- Login ----------------
 if not is_admin_logged_in():

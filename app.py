@@ -8,8 +8,8 @@ bikin error "Multiple Pages specified with URL pathname" lagi.
 """
 import streamlit as st
 
-from utils.styles import apply_ceritajiwa_styles
-from utils.auth import init_session
+from cjlib.styles import apply_ceritajiwa_styles
+from cjlib.auth import init_session
 
 st.set_page_config(
     page_title="Cerita Jiwa Training Center",

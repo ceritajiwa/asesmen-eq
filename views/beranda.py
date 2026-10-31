@@ -3,7 +3,7 @@ from pathlib import Path
 
 import streamlit as st
 
-from utils.styles import esc, footer
+from cjlib.styles import esc, footer
 
 # ---------- Hero ----------
 _logo = base64.b64encode(Path("assets/logo_dark.png").read_bytes()).decode()
