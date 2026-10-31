@@ -1,13 +1,13 @@
 import streamlit as st
 
 from utils.styles import footer, page_header
-from utils.ui import peserta_sidebar, require_peserta_gate
+from utils.ui import peserta_sidebar, require_peserta_gate, subjudul
 
 training, peserta = require_peserta_gate("🎓 Training")
 peserta_sidebar("training")
 
-page_header(f"🎓 Training {training['sertifikasi']}",
-            f"{peserta['nama']} · {training['perusahaan']} · Batch {training['batch']}")
+page_header(f"🎓 Training {training['sertifikasi'] or ''}",
+            subjudul(training, peserta))
 
 st.info("📚 Materi training akan ditampilkan di sini.")
 

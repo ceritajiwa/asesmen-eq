@@ -3,8 +3,8 @@ import streamlit as st
 
 from utils.auth import check_password, is_admin_logged_in
 from utils.db import (
-    SERTIFIKASI_LIST, DatabaseError, create_training, get_trainings,
-    set_training_status, training_label, _is_aktif,
+    SERTIFIKASI_LIST, DatabaseError, create_training, format_tanggal, get_trainings,
+    hitung_statistik, set_kode_akses, training_label,
 )
 from utils.styles import footer, page_header
 from utils.supabase_client import SupabaseNotConfigured
@@ -48,13 +48,14 @@ except (DatabaseError, SupabaseNotConfigured) as e:
     show_db_error(e)
     st.stop()
 
-aktif = [t for t in semua if _is_aktif(t["status"])]
+aktif = [t for t in semua if t["aktif"]]
+stat = hitung_statistik()
 
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("Total Training", len(semua))
-c2.metric("Aktif", len(aktif))
-c3.metric("Total Peserta", "45")
-c4.metric("Lulus", "8")
+c2.metric("Akses Dibuka", len(aktif))
+c3.metric("Total Peserta", stat["peserta"] if stat["peserta"] is not None else "-")
+c4.metric("Lulus", stat["lulus"] if stat["lulus"] is not None else "-")
 
 st.divider()
 
@@ -65,30 +66,41 @@ with h1:
 with h2:
     if st.button("🔄 Muat ulang", width="stretch"):
         get_trainings.clear()
+        hitung_statistik.clear()
         st.rerun()
 
 if semua:
     df = pd.DataFrame([{
-        "Nama Training": t["nama"], "Perusahaan": t["perusahaan"], "Sertifikasi": t["sertifikasi"],
-        "Batch": t["batch"], "Tanggal": t["tanggal"], "Kode Akses": t["kode_akses"],
-        "Status": "Aktif" if _is_aktif(t["status"]) else "Nonaktif",
+        "Nama Training": t["nama"],
+        "Sertifikasi": t["sertifikasi"] or "-",
+        "Dibuat": format_tanggal(t["tanggal"]),
+        "Kode Akses": t["kode_akses"] or "-",
+        "Status": "Dibuka" if t["aktif"] else "Ditutup",
     } for t in semua])
     st.dataframe(df, hide_index=True, width="stretch")
 
-    with st.expander("Aktifkan / nonaktifkan training"):
-        st.caption("Training yang nonaktif tidak muncul di pilihan peserta dan kodenya tidak bisa dipakai login.")
-        opts = {t["id"]: f"{training_label(t)}  ({'Aktif' if _is_aktif(t['status']) else 'Nonaktif'})" for t in semua}
-        pilih = st.selectbox("Training", list(opts.keys()), format_func=lambda x: opts[x], key="status_pilih")
+    with st.expander("🔑 Atur kode akses training", expanded=bool(st.session_state.get("admin_kode_baru"))):
+        st.caption("Training tanpa kode akses tidak muncul di pilihan peserta. "
+                   "Membuat kode baru akan menggantikan kode lama, jadi kode lama langsung tidak berlaku.")
+        opts = {t["id"]: f"{training_label(t)}  ({'Dibuka' if t['aktif'] else 'Ditutup'})" for t in semua}
+        pilih_id = st.selectbox("Training", list(opts.keys()), format_func=lambda x: opts[x], key="kode_pilih")
+        pilih = next(t for t in semua if t["id"] == pilih_id)
         b1, b2 = st.columns(2)
         try:
-            if b1.button("Aktifkan", width="stretch"):
-                set_training_status(pilih, True)
+            if b1.button("Buat kode akses baru", type="primary", width="stretch"):
+                kode = set_kode_akses(pilih, buka=True)
+                st.session_state["admin_kode_baru"] = (pilih["nama"], kode)
                 st.rerun()
-            if b2.button("Nonaktifkan", width="stretch"):
-                set_training_status(pilih, False)
+            if b2.button("Tutup akses (hapus kode)", width="stretch", disabled=not pilih["aktif"]):
+                set_kode_akses(pilih, buka=False)
+                st.session_state.pop("admin_kode_baru", None)
                 st.rerun()
         except DatabaseError as e:
             show_db_error(e)
+        if st.session_state.get("admin_kode_baru"):
+            nama, kode = st.session_state["admin_kode_baru"]
+            st.success(f"Kode akses baru untuk **{nama}**:")
+            st.code(kode, language=None)
 else:
     st.info("Belum ada training di database.")
 
@@ -100,12 +112,11 @@ with st.form("form_training_baru", border=True):
     col1, col2, col3 = st.columns(3)
     with col1:
         sert = st.selectbox("Sertifikasi", SERTIFIKASI_LIST, key="admin_sert")
-        perusahaan = st.text_input("Nama Perusahaan", placeholder="PT Maju Jaya")
     with col2:
-        batch = st.text_input("Batch", "Agustus 2026", key="admin_batch")
-        tanggal = st.date_input("Tanggal Training")
+        perusahaan = st.text_input("Nama Perusahaan", placeholder="PT Maju Jaya")
     with col3:
-        jumlah_peserta = st.number_input("Jumlah Peserta", min_value=1, max_value=100, value=20)
+        batch = st.text_input("Batch", "Agustus 2026", key="admin_batch")
+    st.caption("Nama training akan tersimpan dengan format: SERTIFIKASI - PERUSAHAAN - BATCH")
     simpan = st.form_submit_button("Generate Kode Akses & Simpan", type="primary")
 
 if simpan:
@@ -113,8 +124,8 @@ if simpan:
         st.error("Nama perusahaan dan batch wajib diisi.")
     else:
         try:
-            baru = create_training(sert, perusahaan.strip(), batch.strip(), tanggal)
-            st.success("✅ Training berhasil dibuat dan tersimpan di database!")
+            baru = create_training(sert, perusahaan.strip(), batch.strip())
+            st.success(f"✅ Training **{baru['nama']}** berhasil dibuat dan tersimpan di database!")
             st.code(f"Kode Akses: {baru['kode_akses']}", language=None)
             st.info("Bagikan kode akses ini ke peserta training tersebut.")
         except DatabaseError as e:

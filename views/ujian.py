@@ -1,15 +1,15 @@
 import streamlit as st
 
 from utils.styles import footer, page_header
-from utils.ui import peserta_sidebar, require_peserta_gate
+from utils.ui import peserta_sidebar, require_peserta_gate, subjudul
 
 training, peserta = require_peserta_gate("📋 Ujian")
 peserta_sidebar("ujian")
 
 col1, col2 = st.columns([3, 1])
 with col1:
-    page_header(f"📋 Ujian {training['sertifikasi']}",
-                f"{peserta['nama']} · {training['perusahaan']} · Batch {training['batch']}")
+    page_header(f"📋 Ujian {training['sertifikasi'] or ''}",
+                subjudul(training, peserta))
 with col2:
     st.metric("⏱️ Sisa Waktu", "45:00")
 

@@ -2,13 +2,13 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from utils.styles import footer, page_header
-from utils.ui import peserta_sidebar, require_peserta_gate
+from utils.ui import peserta_sidebar, require_peserta_gate, subjudul
 
 training, peserta = require_peserta_gate("📝 Asesmen")
 peserta_sidebar("asesmen")
 
-page_header(f"📝 Asesmen {training['sertifikasi']}",
-            f"{peserta['nama']} · {training['perusahaan']} · Batch {training['batch']}")
+page_header(f"📝 Asesmen {training['sertifikasi'] or ''}",
+            subjudul(training, peserta))
 
 progress = st.progress(0, text="Progress: 0%")
 

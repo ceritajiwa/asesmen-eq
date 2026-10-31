@@ -29,8 +29,19 @@ supabase/               # query bantu untuk cek struktur database
 | ⚙️ Admin | Password Admin |
 | 👨‍🏫 Trainer / BEI | Password Trainer |
 
-Kode akses tiap training dibaca dari tabel Supabase (default: `trainings`).
-Training dengan status selain `aktif` tidak muncul di pilihan peserta.
+## Database (Supabase, schema `public`)
+
+| Tabel | Dipakai untuk |
+|---|---|
+| `trainings` | Daftar training & kode akses (`name`, `access_code`) |
+| `respondents` | Hitung total peserta di Admin |
+| `exam_attempts` | Riwayat ujian & status lulus di halaman Sertifikat, jumlah lulus di Admin |
+| `responses`, `bei_sessions` | Belum dipakai di versi ini |
+
+Aturan kode akses:
+- Training **dibuka** kalau `access_code` terisi, **ditutup** kalau kosong.
+- Huruf besar/kecil dan spasi di awal/akhir kode diabaikan saat peserta mengetik.
+- Admin bisa membuat training baru, membuat ulang kode, atau menutup akses dari menu Admin.
 
 ## Secrets (Streamlit Cloud > Manage app > Settings > Secrets)
 

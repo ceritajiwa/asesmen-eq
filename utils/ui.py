@@ -49,7 +49,7 @@ def _form_kode_akses(page_title: str):
         with st.form("form_kode_akses", border=True):
             selected = st.selectbox("Pilih Training", options=list(options.keys()),
                                     format_func=lambda x: options[x])
-            kode = st.text_input("Kode Akses", placeholder="Contoh: CERC-AGU-1234")
+            kode = st.text_input("Kode Akses", placeholder="Masukkan kode dari trainer")
             submit = st.form_submit_button("Masuk", type="primary", width="stretch")
 
         if submit:
@@ -72,13 +72,14 @@ def _form_kode_akses(page_title: str):
 
 def _form_peserta(page_title: str):
     training = get_training()
+    detail = " · ".join(x for x in [training.get("perusahaan"), f"Batch {training['batch']}" if training.get("batch") else ""] if x)
     with _narrow():
         st.image("assets/logo_dark.png", width=96)
         page_header(page_title, eyebrow="Langkah 2 dari 2")
         st.markdown(
             f"<div class='cj-card' style='padding:16px 20px;'>"
             f"<p style='margin:0; font-weight:800; color:#344A61;'>{esc(training['nama'])}</p>"
-            f"<p style='margin:2px 0 0; color:#6D6F71;'>{esc(training['perusahaan'])} · Batch {esc(training['batch'])}</p>"
+            + (f"<p style='margin:2px 0 0; color:#6D6F71;'>{esc(detail)}</p>" if detail else "") +
             f"</div>",
             unsafe_allow_html=True,
         )
@@ -101,6 +102,15 @@ def _form_peserta(page_title: str):
     st.stop()
 
 
+def subjudul(training: dict, peserta: dict) -> str:
+    """Baris keterangan di bawah judul halaman: nama peserta · perusahaan · batch (yang kosong dilewati)."""
+    bagian = [peserta.get("nama"), training.get("perusahaan"),
+              f"Batch {training['batch']}" if training.get("batch") else None]
+    if not training.get("perusahaan"):
+        bagian.insert(1, training.get("nama"))
+    return " · ".join(str(b) for b in bagian if b)
+
+
 def require_peserta_gate(page_title: str):
     """Tampilkan form kode akses / data peserta kalau belum lengkap.
     Kalau sudah lengkap, kembalikan (training, peserta)."""
@@ -117,7 +127,7 @@ def peserta_sidebar(page_key: str):
         st.markdown(
             f"<div style='padding:6px 0 4px;'>"
             f"<p style='font-size:16px; font-weight:800; margin:0;'>{esc(peserta['nama'])}</p>"
-            f"<p style='opacity:.7; font-size:12px; margin:2px 0 0;'>{esc(training['sertifikasi'])} · {esc(training['perusahaan'])}</p>"
+            f"<p style='opacity:.7; font-size:12px; margin:2px 0 0;'>{esc(training['nama'])}</p>"
             f"<p style='opacity:.7; font-size:12px; margin:0;'>Kode: {esc(training['kode'])}</p>"
             f"</div><hr>",
             unsafe_allow_html=True,
