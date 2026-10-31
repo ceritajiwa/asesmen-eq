@@ -68,7 +68,7 @@ with col3:
     jumlah_peserta = st.number_input("Jumlah Peserta", min_value=1, max_value=100, value=20)
 
 if st.button("Generate Kode Akses & Simpan", type="primary"):
-    import random, string
+    import random
     kode = f"{sert}-{batch[:3].upper()}-{random.randint(100,999)}"
     st.success(f"✅ Training berhasil dibuat!")
     st.code(f"Kode Akses: {kode}", language=None)

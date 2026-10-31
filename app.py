@@ -1,6 +1,6 @@
 import streamlit as st
 from utils.styles import apply_ceritajiwa_styles
-from utils.auth import init_session
+from utils.auth import init_session, clear_all
 
 st.set_page_config(page_title="Cerita Jiwa Training Center", page_icon="🧠", layout="wide", initial_sidebar_state="collapsed")
 apply_ceritajiwa_styles()
@@ -15,17 +15,25 @@ with col2:
 st.divider()
 st.markdown("<h3 style='text-align:center; color:#344A61;'>Menu</h3>", unsafe_allow_html=True)
 
+# MENU BUTTONS - pakai st.button + st.switch_page (lebih stabil)
 c1, c2, c3 = st.columns(3)
 with c1:
-    st.page_link("pages/01_Asesmen.py", label="📝 Asesmen", use_container_width=True)
-    st.page_link("pages/02_Training.py", label="🎓 Training", use_container_width=True)
-    st.page_link("pages/03_Ujian.py", label="📋 Ujian", use_container_width=True)
+    if st.button("📝 Asesmen", use_container_width=True, key="menu_asesmen"):
+        st.switch_page("pages/01_Asesmen.py")
+    if st.button("🎓 Training", use_container_width=True, key="menu_training"):
+        st.switch_page("pages/02_Training.py")
+    if st.button("📋 Ujian", use_container_width=True, key="menu_ujian"):
+        st.switch_page("pages/03_Ujian.py")
 with c2:
-    st.page_link("pages/04_Sertifikat.py", label="📜 Sertifikat", use_container_width=True)
-    st.page_link("pages/05_Verifikasi.py", label="🔍 Cek Sertifikasi", use_container_width=True)
+    if st.button("📜 Sertifikat", use_container_width=True, key="menu_sertifikat"):
+        st.switch_page("pages/04_Sertifikat.py")
+    if st.button("🔍 Cek Sertifikasi", use_container_width=True, key="menu_verifikasi"):
+        st.switch_page("pages/05_Verifikasi.py")
 with c3:
-    st.page_link("pages/06_Admin.py", label="⚙️ Admin", use_container_width=True)
-    st.page_link("pages/07_Trainer.py", label="👨‍🏫 Trainer / BEI", use_container_width=True)
+    if st.button("⚙️ Admin", use_container_width=True, key="menu_admin"):
+        st.switch_page("pages/06_Admin.py")
+    if st.button("👨‍🏫 Trainer / BEI", use_container_width=True, key="menu_trainer"):
+        st.switch_page("pages/07_Trainer.py")
 
 st.divider()
 st.markdown("<div style='text-align:center; padding: 20px 0;'><h2 style='color:#344A61;'>Sertifikasi Profesional untuk Kesehatan Mental</h2><p style='color:#6D6F71; font-size:18px;'>CERC | CMBC | CPSC | CPPC | CRWC | CCTC</p></div>", unsafe_allow_html=True)

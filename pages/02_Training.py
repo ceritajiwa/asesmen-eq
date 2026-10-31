@@ -3,6 +3,7 @@ import streamlit as st
 from utils.styles import apply_ceritajiwa_styles
 from utils.auth import init_session, is_training_set, is_peserta_set, set_training_session, set_peserta, get_training, get_peserta, verifikasi_kode_akses, get_trainings_list, clear_training_session
 
+st.set_page_config(page_title="🎓 Training - Cerita Jiwa", layout="wide")
 apply_ceritajiwa_styles()
 init_session()
 
@@ -54,11 +55,15 @@ peserta = get_peserta()
 
 with st.sidebar:
     st.markdown(f"<div style='text-align:center; padding:10px 0;'><p style='color:white; font-size:16px; font-weight:700; margin:0;'>{peserta['nama']}</p><p style='color:rgba(255,255,255,0.6); font-size:12px; margin:4px 0 0 0;'>{training['kode']}</p></div><hr style='border-color:rgba(255,255,255,0.15);'>", unsafe_allow_html=True)
-    st.page_link("app.py", label="🏠 Beranda")
-    st.page_link("pages/01_Asesmen.py", label="📝 Asesmen")
-    st.page_link("pages/02_Training.py", label="🎓 Training", disabled=True)
-    st.page_link("pages/03_Ujian.py", label="📋 Ujian")
-    st.page_link("pages/04_Sertifikat.py", label="📜 Sertifikat")
+    if st.button("🏠 Beranda", use_container_width=True, key="training_home"):
+        st.switch_page("app.py")
+    if st.button("📝 Asesmen", use_container_width=True, key="training_asesmen"):
+        st.switch_page("pages/01_Asesmen.py")
+    if st.button("📋 Ujian", use_container_width=True, key="training_ujian"):
+        st.switch_page("pages/03_Ujian.py")
+    if st.button("📜 Sertifikat", use_container_width=True, key="training_sertifikat"):
+        st.switch_page("pages/04_Sertifikat.py")
+    st.markdown("<hr style='border-color:rgba(255,255,255,0.15);'>", unsafe_allow_html=True)
     if st.button("🚪 Keluar", use_container_width=True, key="keluar_training"):
         clear_training_session()
         st.switch_page("app.py")
@@ -66,4 +71,9 @@ with st.sidebar:
 st.title(f"🎓 Training {training['sertifikasi']}")
 st.caption(f"{peserta['nama']} | {training['perusahaan']} | Batch: {training['batch']}")
 st.info("📚 Materi training akan ditampilkan di sini.")
-st.markdown("### Jadwal Training Hari Ini\n- **08:00 - 09:00** : Asesmen\n- **09:00 - 12:00** : Sesi Pagi\n- **12:00 - 13:00** : Istirahat\n- **13:00 - 16:00** : Sesi Sore\n- **16:00 - 17:00** : Ujian")
+st.markdown("### Jadwal Training Hari Ini
+- **08:00 - 09:00** : Asesmen
+- **09:00 - 12:00** : Sesi Pagi
+- **12:00 - 13:00** : Istirahat
+- **13:00 - 16:00** : Sesi Sore
+- **16:00 - 17:00** : Ujian")

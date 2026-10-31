@@ -78,7 +78,6 @@ def get_peserta():
 def require_training():
     if not is_training_set():
         st.warning("Silakan pilih training dan masukkan kode akses.")
-        st.page_link("app.py", label="← Kembali ke Beranda")
         st.stop()
 
 def require_peserta():
@@ -90,17 +89,14 @@ def require_peserta():
 def require_admin():
     if not is_admin_logged_in():
         st.warning("Silakan login sebagai Admin.")
-        st.page_link("app.py", label="← Kembali")
         st.stop()
 
 def require_trainer():
     if not is_trainer_logged_in():
         st.warning("Silakan login sebagai Trainer.")
-        st.page_link("app.py", label="← Kembali")
         st.stop()
 
-# ===== MOCK DATABASE: TRAININGS (per perusahaan/batch) =====
-# Nanti diganti query ke Supabase
+# MOCK DATABASE: TRAININGS (per perusahaan/batch)
 MOCK_TRAININGS = {
     "TR-CERC-001": {
         "kode_akses": "CERC-AGT-001",
@@ -132,11 +128,9 @@ MOCK_TRAININGS = {
 }
 
 def get_trainings_list():
-    """Return list of trainings for dropdown."""
     return [(k, f"{v['sertifikasi']} - {v['perusahaan']} - {v['batch']}") for k, v in MOCK_TRAININGS.items()]
 
 def verifikasi_kode_akses(training_id, kode_input):
-    """Verifikasi kode akses untuk training tertentu."""
     kode_input = kode_input.strip().upper()
     training = MOCK_TRAININGS.get(training_id)
     if training and training["kode_akses"] == kode_input:
