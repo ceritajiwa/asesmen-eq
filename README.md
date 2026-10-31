@@ -1,5 +1,21 @@
 # Cerita Jiwa Training Center
 
+Aplikasi Streamlit untuk asesmen, training, ujian, dan sertifikat Cerita Jiwa.
+
+## Struktur
+
+```
+app.py                  # entrypoint + daftar menu (st.navigation)
+views/                  # isi tiap halaman
+utils/db.py             # akses tabel training & kode akses di Supabase (atur nama tabel/kolom di sini)
+utils/ui.py             # form kode akses + data peserta (dipakai 4 halaman peserta)
+utils/auth.py           # session & cek password
+utils/styles.py         # tampilan (warna brand, font, komponen)
+supabase/               # query bantu untuk cek struktur database
+```
+
+> Folder `pages/` versi lama **dihapus**. Kalau masih ada di GitHub, hapus saja; aplikasi sudah tidak memakainya.
+
 ## Menu & Akses
 
 | Menu | Cara Akses |
@@ -13,28 +29,18 @@
 | ⚙️ Admin | Password Admin |
 | 👨‍🏫 Trainer / BEI | Password Trainer |
 
-## Kode Akses Demo (per Training)
+Kode akses tiap training dibaca dari tabel Supabase (default: `trainings`).
+Training dengan status selain `aktif` tidak muncul di pilihan peserta.
 
-| Kode Akses | Training | Perusahaan |
-|------------|----------|------------|
-| CERC-AGT-001 | CERC Batch Agustus 2026 | PT Maju Jaya |
-| CERC-SEP-001 | CERC Batch September 2026 | PT Sejahtera |
-| CMBC-OKT-001 | CMBC Batch Oktober 2026 | PT Sukses Abadi |
+## Secrets (Streamlit Cloud > Manage app > Settings > Secrets)
 
-## Password
-
-| Role | Password |
-|------|----------|
-| Admin | `asesmencerc12` |
-| Trainer | `trainercj12` (kalau kosong pakai admin password) |
-
-## Secrets
+Isi di Streamlit Cloud, **jangan** ditulis di repo:
 
 ```toml
-SUPABASE_URL = "https://infguupogksohjmtomzq.supabase.co"
+SUPABASE_URL = "https://xxxx.supabase.co"
 SUPABASE_KEY = "..."
-ADMIN_PASSWORD = "asesmencerc12"
-TRAINER_PASSWORD = "trainercj12"
+ADMIN_PASSWORD = "..."
+TRAINER_PASSWORD = "..."   # kalau kosong, pakai ADMIN_PASSWORD
 GEMINI_API_KEY = "..."
 GROQ_API_KEY = "..."
 ```

@@ -1,10 +1,17 @@
+import hmac
+
 import streamlit as st
+
+_TRAINING_KEYS = [
+    "training_id", "training_kode", "training_nama", "training_perusahaan",
+    "training_sertifikasi", "training_batch",
+]
+_PESERTA_KEYS = ["peserta_nama", "peserta_email"]
+
 
 def init_session():
     defaults = {
-        "training_id": None, "training_kode": None, "training_nama": None,
-        "training_perusahaan": None, "training_sertifikasi": None, "training_batch": None,
-        "peserta_nama": None, "peserta_email": None,
+        **{k: None for k in _TRAINING_KEYS + _PESERTA_KEYS},
         "asesmen_done": False, "ujian_attempts": 0, "current_nilai": 0,
         "admin_logged_in": False, "trainer_logged_in": False,
     }
@@ -12,37 +19,44 @@ def init_session():
         if key not in st.session_state:
             st.session_state[key] = val
 
-def set_training_session(training_id, kode, nama, perusahaan, sertifikasi, batch):
-    st.session_state.training_id = training_id
-    st.session_state.training_kode = kode
-    st.session_state.training_nama = nama
-    st.session_state.training_perusahaan = perusahaan
-    st.session_state.training_sertifikasi = sertifikasi
-    st.session_state.training_batch = batch
+
+def set_training_session(t: dict):
+    st.session_state.training_id = t["id"]
+    st.session_state.training_kode = t["kode_akses"]
+    st.session_state.training_nama = t["nama"]
+    st.session_state.training_perusahaan = t["perusahaan"]
+    st.session_state.training_sertifikasi = t["sertifikasi"]
+    st.session_state.training_batch = t["batch"]
+
 
 def set_peserta(nama, email):
-    st.session_state.peserta_nama = nama
-    st.session_state.peserta_email = email
+    st.session_state.peserta_nama = nama.strip()
+    st.session_state.peserta_email = email.strip().lower()
+
 
 def clear_training_session():
-    for k in ["training_id", "training_kode", "training_nama", "training_perusahaan",
-              "training_sertifikasi", "training_batch", "peserta_nama", "peserta_email",
-              "asesmen_done", "ujian_attempts", "current_nilai"]:
-        st.session_state[k] = None if k not in ["ujian_attempts", "current_nilai"] else 0
+    for k in _TRAINING_KEYS + _PESERTA_KEYS:
+        st.session_state[k] = None
     st.session_state.asesmen_done = False
+    st.session_state.ujian_attempts = 0
+    st.session_state.current_nilai = 0
 
-def clear_all():
-    for k in ["training_id", "training_kode", "training_nama", "training_perusahaan",
-              "training_sertifikasi", "training_batch", "peserta_nama", "peserta_email",
-              "asesmen_done", "ujian_attempts", "current_nilai",
-              "admin_logged_in", "trainer_logged_in"]:
-        st.session_state[k] = None if k not in ["ujian_attempts", "current_nilai"] else 0
-    st.session_state.asesmen_done = False
 
-def is_training_set(): return st.session_state.training_id is not None
-def is_peserta_set(): return st.session_state.peserta_nama is not None
-def is_admin_logged_in(): return st.session_state.admin_logged_in
-def is_trainer_logged_in(): return st.session_state.trainer_logged_in
+def is_training_set():
+    return st.session_state.get("training_id") is not None
+
+
+def is_peserta_set():
+    return st.session_state.get("peserta_nama") is not None
+
+
+def is_admin_logged_in():
+    return bool(st.session_state.get("admin_logged_in"))
+
+
+def is_trainer_logged_in():
+    return bool(st.session_state.get("trainer_logged_in"))
+
 
 def get_training():
     return {
@@ -51,54 +65,17 @@ def get_training():
         "sertifikasi": st.session_state.training_sertifikasi, "batch": st.session_state.training_batch,
     }
 
+
 def get_peserta():
     return {"nama": st.session_state.peserta_nama, "email": st.session_state.peserta_email}
 
-def require_training():
-    if not is_training_set():
-        st.warning("Silakan pilih training dan masukkan kode akses.")
-        st.stop()
 
-def require_peserta():
-    require_training()
-    if not is_peserta_set():
-        st.warning("Silakan isi nama dan email.")
-        st.stop()
-
-def require_admin():
-    if not is_admin_logged_in():
-        st.warning("Silakan login sebagai Admin.")
-        st.stop()
-
-def require_trainer():
-    if not is_trainer_logged_in():
-        st.warning("Silakan login sebagai Trainer.")
-        st.stop()
-
-MOCK_TRAININGS = {
-    "TR-CERC-001": {
-        "kode_akses": "CERC-AGT-001", "nama_training": "CERC Batch Agustus 2026",
-        "perusahaan": "PT Maju Jaya", "sertifikasi": "CERC", "batch": "Agustus 2026",
-        "tanggal": "2026-08-15", "status": "aktif",
-    },
-    "TR-CERC-002": {
-        "kode_akses": "CERC-SEP-001", "nama_training": "CERC Batch September 2026",
-        "perusahaan": "PT Sejahtera", "sertifikasi": "CERC", "batch": "September 2026",
-        "tanggal": "2026-09-20", "status": "aktif",
-    },
-    "TR-CMBC-001": {
-        "kode_akses": "CMBC-OKT-001", "nama_training": "CMBC Batch Oktober 2026",
-        "perusahaan": "PT Sukses Abadi", "sertifikasi": "CMBC", "batch": "Oktober 2026",
-        "tanggal": "2026-10-10", "status": "aktif",
-    },
-}
-
-def get_trainings_list():
-    return [(k, f"{v['sertifikasi']} - {v['perusahaan']} - {v['batch']}") for k, v in MOCK_TRAININGS.items()]
-
-def verifikasi_kode_akses(training_id, kode_input):
-    kode_input = kode_input.strip().upper()
-    training = MOCK_TRAININGS.get(training_id)
-    if training and training["kode_akses"] == kode_input:
-        return training
-    return None
+def check_password(input_pw: str, secret_name: str, fallback_secret: str | None = None) -> bool | None:
+    """True/False hasil cek. None kalau password belum diatur di Secrets.
+    Password TIDAK ada di kode, hanya di Secrets Streamlit."""
+    expected = st.secrets.get(secret_name, "")
+    if not expected and fallback_secret:
+        expected = st.secrets.get(fallback_secret, "")
+    if not expected:
+        return None
+    return hmac.compare_digest(str(input_pw), str(expected))
