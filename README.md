@@ -28,7 +28,7 @@ Folder `pages/` dan `utils/` versi lama sudah tidak dipakai. **Hapus dari GitHub
 | 📋 Ujian | sama | Paket ujian 40 soal, satu halaman, review jawaban, ulangi soal salah |
 | 📜 Sertifikat | sama | Sertifikat PDF, badge, riwayat ujian, report asesmen |
 | 🔍 Cek Sertifikasi | Publik | Cari nama / nomor sertifikat |
-| ⚙️ Admin | Password admin | Report perusahaan & individu, kelola training, nomor sertifikat, data dummy, riwayat ujian |
+| ⚙️ Admin | Password admin | Report perusahaan & individu, kelola training, data dummy, riwayat ujian |
 | 👨‍🏫 Trainer / BEI | Password trainer | Catatan sesi konseling + AI |
 
 Kode akses: kalau `access_code` sebuah training dikosongkan, training itu publik (tanpa kode).
@@ -45,10 +45,3 @@ GROQ_API_KEY = "..."
 ```
 
 Jangan tulis password atau key di file mana pun di repo, karena repo ini publik.
-
-## Nomor sertifikat
-
-Nomor sertifikat diberikan admin di Admin > Nomor Sertifikat (edit langsung di tabel, isi otomatis berurutan,
-atau import dari CSV/Excel daftar cetak). Butuh tabel `certificates`: jalankan `supabase/2_tabel_sertifikat.sql`
-sekali di Supabase SQL Editor. Peserta baru bisa mengunduh sertifikat dan badge setelah nomornya diisi admin.
-Desain sertifikat ada di `assets/sertifikat_template.png` (ganti file ini kalau desain berubah).

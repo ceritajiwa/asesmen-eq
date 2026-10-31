@@ -8,7 +8,6 @@ import streamlit as st
 from bei import bei_company_pdf, bei_participant_pdf, fetch_bei
 from charts import (action_map_chart, band_distribution_chart, cluster_donut, dims_heatmap, index_heatmap,
                     radar_chart)
-from cjlib import admin_sertifikat
 from cjlib.auth import check_password, is_admin_logged_in
 from cjlib.db import (ALL_KEYS, INST_MAP, fetch_respondents, fetch_responses, fetch_trainings_raw, get_enabled,
                       get_trainings, sb as _sb)
@@ -62,12 +61,7 @@ with st.sidebar:
 sb = _sb()
 
 page_header("⚙️ Dashboard Admin")
-tab1, tab2, tab3, tab6, tab4, tab5 = st.tabs(["📊 Report per Perusahaan", "👤 Report per Individu", "🏢 Kelola Training",
-                                              "🎫 Nomor Sertifikat", "🧪 Data Dummy", "🎓 Riwayat Ujian"])
-
-with tab6:
-    admin_sertifikat.render()
-
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 Report per Perusahaan", "👤 Report per Individu", "🏢 Kelola Training", "🧪 Data Dummy", "🎓 Riwayat Ujian"])
 
 # ---------- TAB 1 ----------
 with tab1:

@@ -202,118 +202,51 @@ def riwayat_ujian(training_id, email: str) -> list[dict]:
     return res.data or []
 
 
+def nomor_sertifikat(attempt: dict, fallback_kode: str = "") -> str:
+    """Nomor unik dari id baris exam_attempts, contoh: CERC-2026-000089."""
+    kode = attempt.get("package") or fallback_kode or "CJ"
+    dt = _parse_waktu(attempt.get("created_at"))
+    tahun = dt.year if dt else datetime.now(WIB).year
+    return f"{kode}-{tahun}-{int(attempt.get('id') or 0):06d}"
+
+
 def judul_paket(kode: str) -> str:
     return EXAM_PACKAGES.get(kode, {}).get("title", kode or "")
 
 
-# ----------------------------------------------------------------------------
-# Nomor sertifikat (tabel certificates, diisi admin)
-# ----------------------------------------------------------------------------
-SQL_SERTIFIKAT = "supabase/2_tabel_sertifikat.sql"
-
-
-class TabelSertifikatBelumAda(DatabaseError):
-    pass
-
-
-def _cek_tabel(e: Exception):
-    teks = str(e)
-    if "certificates" in teks and ("does not exist" in teks or "PGRST205" in teks or "schema cache" in teks):
-        raise TabelSertifikatBelumAda(teks) from e
-    raise DatabaseError(teks) from e
-
-
-def fetch_certificates(training_id) -> list[dict]:
-    try:
-        return (sb().table("certificates").select("*").eq("training_id", training_id)
-                .order("full_name").execute().data or [])
-    except Exception as e:  # noqa: BLE001
-        _cek_tabel(e)
-
-
-def fetch_passed_attempts(training_id) -> list[dict]:
-    """Kelulusan pertama per (email, paket) di training ini."""
-    rows = (sb().table("exam_attempts").select("*").eq("training_id", training_id).eq("passed", True)
-            .order("created_at").execute().data or [])
-    out, seen = [], set()
-    for r in rows:
-        k = ((r.get("email") or "").lower(), r.get("package"))
-        if k not in seen:
-            seen.add(k)
-            out.append(r)
-    return out
-
-
-def cek_nomor_dipakai(nomor_list: list[str], kecuali_ids: list) -> list[str]:
-    """Nomor sertifikat yang sudah dipakai baris lain di database (semua training)."""
-    if not nomor_list:
-        return []
-    try:
-        rows = sb().table("certificates").select("id, cert_no, full_name").not_.is_("cert_no", "null").execute().data or []
-    except Exception as e:  # noqa: BLE001
-        _cek_tabel(e)
-    kecuali = set(kecuali_ids)
-    target = {n.upper() for n in nomor_list}
-    return sorted({f"{r['cert_no']} (dipakai {r['full_name']})" for r in rows
-                   if r["id"] not in kecuali and (r.get("cert_no") or "").upper() in target})
-
-
-def simpan_sertifikat(training_id, insert_rows: list[dict], update_rows: list[dict], delete_ids: list) -> None:
-    now = datetime.now(WIB).isoformat()
-    try:
-        for cid in delete_ids:
-            sb().table("certificates").delete().eq("id", cid).execute()
-        # Tahap 1: kosongkan dulu nomor baris yang diubah, supaya tukar-menukar nomor
-        # antar peserta tidak bentrok dengan aturan "nomor tidak boleh dobel".
-        for r in update_rows:
-            sb().table("certificates").update({"cert_no": None}).eq("id", r["id"]).execute()
-        for r in update_rows:
-            r = dict(r)
-            cid = r.pop("id")
-            sb().table("certificates").update({**r, "updated_at": now}).eq("id", cid).execute()
-        if insert_rows:
-            sb().table("certificates").insert([{**r, "training_id": training_id} for r in insert_rows]).execute()
-    except Exception as e:  # noqa: BLE001
-        _cek_tabel(e)
-
-
-def sertifikat_peserta(training_id, email: str) -> list[dict]:
-    """Sertifikat (yang sudah diberi nomor oleh admin) milik peserta di training ini."""
-    try:
-        rows = (sb().table("certificates").select("*").eq("training_id", training_id)
-                .ilike("email", (email or "").strip()).execute().data or [])
-    except Exception as e:  # noqa: BLE001
-        try:
-            _cek_tabel(e)
-        except TabelSertifikatBelumAda:
-            return []
-    return rows
-
-
 def cari_sertifikat(sertifikasi: str, kata_kunci: str) -> list[dict]:
-    """Cari sertifikat yang SUDAH diberi nomor oleh admin, berdasarkan nomor atau nama lengkap."""
+    """Cari kelulusan berdasarkan nomor sertifikat (CERC-2026-000089) atau nama lengkap."""
     kata_kunci = (kata_kunci or "").strip()
-    if len(kata_kunci) < 3:
-        return []
     try:
-        q = sb().table("certificates").select("*").not_.is_("cert_no", "null")
-        by_no = q.ilike("cert_no", kata_kunci).execute().data or []
-        rows = by_no or (sb().table("certificates").select("*").not_.is_("cert_no", "null")
-                         .ilike("full_name", f"%{kata_kunci}%").limit(50).execute().data or [])
-        if not rows:
+        m = re.fullmatch(r"([A-Za-z]+)-(\d{4})-(\d+)", kata_kunci)
+        q = sb().table("exam_attempts").select("*").eq("passed", True)
+        if m:
+            q = q.eq("id", int(m.group(3)))
+        else:
+            if len(kata_kunci) < 3:
+                return []
+            q = q.ilike("full_name", f"%{kata_kunci}%")
+        attempts = q.order("created_at").limit(100).execute().data or []
+        if not attempts:
             return []
-        ids = list({r["training_id"] for r in rows})
+        ids = list({a["training_id"] for a in attempts})
         tr = sb().table("trainings").select("id, name").in_("id", ids).execute().data or []
     except Exception as e:  # noqa: BLE001
-        _cek_tabel(e)
+        raise DatabaseError(str(e)) from e
     nama_tr = {t["id"]: t["name"] for t in tr}
-    hasil = []
-    for r in rows:
-        if sertifikasi and r.get("package") and r["package"] != sertifikasi:
+    hasil, sudah = [], set()
+    for a in attempts:
+        kode = a.get("package") or tebak_sertifikasi(nama_tr.get(a["training_id"], ""))
+        if m and kode and kode.upper() != m.group(1).upper():
             continue
+        if sertifikasi and kode and kode != sertifikasi:
+            continue
+        kunci = (a["training_id"], (a.get("email") or a["full_name"] or "").lower(), kode)
+        if kunci in sudah:  # satu sertifikat per orang per training per paket (kelulusan pertama)
+            continue
+        sudah.add(kunci)
         hasil.append({
-            "nama": r["full_name"], "training": nama_tr.get(r["training_id"], ""),
-            "paket": judul_paket(r.get("package")) or "-", "nomor": r["cert_no"],
-            "tanggal": format_tanggal(r.get("issued_date")),
+            "nama": a["full_name"], "training": nama_tr.get(a["training_id"], ""),
+            "paket": judul_paket(kode), "nomor": nomor_sertifikat(a), "tanggal": format_tanggal(a["created_at"]),
         })
     return hasil

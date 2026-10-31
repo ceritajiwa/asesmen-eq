@@ -1,11 +1,9 @@
-import re
-
 import pandas as pd
 import streamlit as st
 
 from cjlib import pdf
 from cjlib.db import (DatabaseError, cari_respondent, format_tanggal, jawaban_respondent, judul_paket,
-                      riwayat_ujian, sertifikat_peserta)
+                      nomor_sertifikat, riwayat_ujian)
 from cjlib.hasil import pdf_individu
 from cjlib.styles import footer, page_header
 from cjlib.ui import peserta_sidebar, require_peserta_gate, show_db_error
@@ -23,44 +21,38 @@ except DatabaseError as e:
     riwayat = []
     show_db_error(e)
 
-bernomor = [c for c in sertifikat_peserta(training["id"], peserta["email"]) if (c.get("cert_no") or "").strip()]
-lulus = [r for r in riwayat if r.get("passed")]
+# Kelulusan pertama per paket ujian
+lulus_per_paket = {}
+for r in riwayat:
+    if r.get("passed") and r.get("package") not in lulus_per_paket:
+        lulus_per_paket[r.get("package")] = r
 
-if bernomor:
-    for c in bernomor:
-        paket = c.get("package") or ""
-        nomor = c["cert_no"].strip()
-        tanggal = format_tanggal(c.get("issued_date"))
-        kunci = re.sub(r"\W+", "_", nomor)
-        with st.container(border=True, key=f"card_sertifikat_{kunci}"):
-            st.markdown(f"**{judul_paket(paket) or training['nama']}**")
+if lulus_per_paket:
+    for paket, att in lulus_per_paket.items():
+        nomor = nomor_sertifikat(att, training.get("sertifikasi"))
+        tanggal = format_tanggal(att.get("created_at"))
+        with st.container(border=True, key=f"card_sertifikat_{paket}"):
+            st.markdown(f"**{judul_paket(paket) or 'Ujian Sertifikasi'}**")
             c1, c2, c3 = st.columns(3)
             c1.metric("Status", "LULUS")
             c2.metric("No. Sertifikat", nomor)
-            c3.metric("Tanggal Terbit", tanggal)
+            c3.metric("Tanggal Lulus", tanggal)
             col1, col2 = st.columns(2)
             with col1:
                 st.download_button(
                     "📥 Download Sertifikat PDF",
-                    data=pdf.sertifikat(c["full_name"],
+                    data=pdf.sertifikat(peserta["nama"],
                                         pdf.judul_program(paket or training.get("sertifikasi"),
                                                           judul_paket(paket) or training["nama"]),
                                         nomor, tanggal),
-                    file_name=f"sertifikat_{kunci}.pdf", mime="application/pdf",
-                    type="primary", width="stretch", key=f"dl_sert_{kunci}")
+                    file_name=f"sertifikat_{(paket or 'cj').lower()}_{nama_file}.pdf", mime="application/pdf",
+                    type="primary", width="stretch", key=f"dl_sert_{paket}")
             with col2:
                 st.download_button(
                     "🏅 Download Badge",
-                    data=pdf.badge_png(paket or "CJ", c["full_name"], nomor),
-                    file_name=f"badge_{kunci}.png", mime="image/png", width="stretch", key=f"dl_badge_{kunci}")
-elif lulus:
-    with st.container(border=True, key="card_sertifikat_proses"):
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Status", "LULUS")
-        c2.metric("No. Sertifikat", "Diproses")
-        c3.metric("Tanggal Lulus", format_tanggal(lulus[0].get("created_at")))
-        st.info("Selamat, Anda sudah lulus ujian. Nomor sertifikat sedang disiapkan admin. "
-                "Sertifikat bisa diunduh di halaman ini setelah nomornya diberikan.")
+                    data=pdf.badge_png(paket or "CJ", peserta["nama"], nomor),
+                    file_name=f"badge_{(paket or 'cj').lower()}_{nama_file}.png", mime="image/png",
+                    width="stretch", key=f"dl_badge_{paket}")
 else:
     with st.container(border=True, key="card_sertifikat_none"):
         c1, c2, c3 = st.columns(3)
