@@ -3,7 +3,6 @@ import plotly.graph_objects as go
 from utils.styles import apply_ceritajiwa_styles
 from utils.auth import init_session, is_trainer_logged_in
 
-st.set_page_config(page_title="Trainer / BEI - Cerita Jiwa", page_icon="👨‍🏫", layout="wide")
 apply_ceritajiwa_styles()
 init_session()
 

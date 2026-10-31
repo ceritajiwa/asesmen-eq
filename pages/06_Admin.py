@@ -3,7 +3,6 @@ import pandas as pd
 from utils.styles import apply_ceritajiwa_styles
 from utils.auth import init_session, is_admin_logged_in, MOCK_TRAININGS
 
-st.set_page_config(page_title="Admin - Cerita Jiwa", page_icon="⚙️", layout="wide")
 apply_ceritajiwa_styles()
 init_session()
 
@@ -45,13 +44,9 @@ st.subheader("📋 Daftar Training")
 data_table = []
 for tid, info in MOCK_TRAININGS.items():
     data_table.append({
-        "ID": tid,
-        "Nama Training": info["nama_training"],
-        "Perusahaan": info["perusahaan"],
-        "Sertifikasi": info["sertifikasi"],
-        "Batch": info["batch"],
-        "Kode Akses": info["kode_akses"],
-        "Status": info["status"],
+        "ID": tid, "Nama Training": info["nama_training"], "Perusahaan": info["perusahaan"],
+        "Sertifikasi": info["sertifikasi"], "Batch": info["batch"],
+        "Kode Akses": info["kode_akses"], "Status": info["status"],
     })
 st.dataframe(data_table, use_container_width=True)
 

@@ -3,7 +3,6 @@ import streamlit as st
 from utils.styles import apply_ceritajiwa_styles
 from utils.auth import init_session, is_training_set, is_peserta_set, set_training_session, set_peserta, get_training, get_peserta, verifikasi_kode_akses, get_trainings_list, clear_training_session
 
-st.set_page_config(page_title="🎓 Training - Cerita Jiwa", layout="wide")
 apply_ceritajiwa_styles()
 init_session()
 

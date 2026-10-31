@@ -2,19 +2,11 @@ import streamlit as st
 
 def init_session():
     defaults = {
-        "training_id": None,
-        "training_kode": None,
-        "training_nama": None,
-        "training_perusahaan": None,
-        "training_sertifikasi": None,
-        "training_batch": None,
-        "peserta_nama": None,
-        "peserta_email": None,
-        "asesmen_done": False,
-        "ujian_attempts": 0,
-        "current_nilai": 0,
-        "admin_logged_in": False,
-        "trainer_logged_in": False,
+        "training_id": None, "training_kode": None, "training_nama": None,
+        "training_perusahaan": None, "training_sertifikasi": None, "training_batch": None,
+        "peserta_nama": None, "peserta_email": None,
+        "asesmen_done": False, "ujian_attempts": 0, "current_nilai": 0,
+        "admin_logged_in": False, "trainer_logged_in": False,
     }
     for key, val in defaults.items():
         if key not in st.session_state:
@@ -47,33 +39,20 @@ def clear_all():
         st.session_state[k] = None if k not in ["ujian_attempts", "current_nilai"] else 0
     st.session_state.asesmen_done = False
 
-def is_training_set():
-    return st.session_state.training_id is not None
-
-def is_peserta_set():
-    return st.session_state.peserta_nama is not None
-
-def is_admin_logged_in():
-    return st.session_state.admin_logged_in
-
-def is_trainer_logged_in():
-    return st.session_state.trainer_logged_in
+def is_training_set(): return st.session_state.training_id is not None
+def is_peserta_set(): return st.session_state.peserta_nama is not None
+def is_admin_logged_in(): return st.session_state.admin_logged_in
+def is_trainer_logged_in(): return st.session_state.trainer_logged_in
 
 def get_training():
     return {
-        "id": st.session_state.training_id,
-        "kode": st.session_state.training_kode,
-        "nama": st.session_state.training_nama,
-        "perusahaan": st.session_state.training_perusahaan,
-        "sertifikasi": st.session_state.training_sertifikasi,
-        "batch": st.session_state.training_batch,
+        "id": st.session_state.training_id, "kode": st.session_state.training_kode,
+        "nama": st.session_state.training_nama, "perusahaan": st.session_state.training_perusahaan,
+        "sertifikasi": st.session_state.training_sertifikasi, "batch": st.session_state.training_batch,
     }
 
 def get_peserta():
-    return {
-        "nama": st.session_state.peserta_nama,
-        "email": st.session_state.peserta_email,
-    }
+    return {"nama": st.session_state.peserta_nama, "email": st.session_state.peserta_email}
 
 def require_training():
     if not is_training_set():
@@ -96,34 +75,21 @@ def require_trainer():
         st.warning("Silakan login sebagai Trainer.")
         st.stop()
 
-# MOCK DATABASE: TRAININGS (per perusahaan/batch)
 MOCK_TRAININGS = {
     "TR-CERC-001": {
-        "kode_akses": "CERC-AGT-001",
-        "nama_training": "CERC Batch Agustus 2026",
-        "perusahaan": "PT Maju Jaya",
-        "sertifikasi": "CERC",
-        "batch": "Agustus 2026",
-        "tanggal": "2026-08-15",
-        "status": "aktif",
+        "kode_akses": "CERC-AGT-001", "nama_training": "CERC Batch Agustus 2026",
+        "perusahaan": "PT Maju Jaya", "sertifikasi": "CERC", "batch": "Agustus 2026",
+        "tanggal": "2026-08-15", "status": "aktif",
     },
     "TR-CERC-002": {
-        "kode_akses": "CERC-SEP-001",
-        "nama_training": "CERC Batch September 2026",
-        "perusahaan": "PT Sejahtera",
-        "sertifikasi": "CERC",
-        "batch": "September 2026",
-        "tanggal": "2026-09-20",
-        "status": "aktif",
+        "kode_akses": "CERC-SEP-001", "nama_training": "CERC Batch September 2026",
+        "perusahaan": "PT Sejahtera", "sertifikasi": "CERC", "batch": "September 2026",
+        "tanggal": "2026-09-20", "status": "aktif",
     },
     "TR-CMBC-001": {
-        "kode_akses": "CMBC-OKT-001",
-        "nama_training": "CMBC Batch Oktober 2026",
-        "perusahaan": "PT Sukses Abadi",
-        "sertifikasi": "CMBC",
-        "batch": "Oktober 2026",
-        "tanggal": "2026-10-10",
-        "status": "aktif",
+        "kode_akses": "CMBC-OKT-001", "nama_training": "CMBC Batch Oktober 2026",
+        "perusahaan": "PT Sukses Abadi", "sertifikasi": "CMBC", "batch": "Oktober 2026",
+        "tanggal": "2026-10-10", "status": "aktif",
     },
 }
 

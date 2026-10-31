@@ -25,8 +25,8 @@
 
 | Role | Password |
 |------|----------|
-| Admin | `asesmencerc12` (atau dari secrets) |
-| Trainer | `trainercj12` (atau dari secrets, kalau kosong pakai admin password) |
+| Admin | `asesmencerc12` |
+| Trainer | `trainercj12` (kalau kosong pakai admin password) |
 
 ## Secrets
 

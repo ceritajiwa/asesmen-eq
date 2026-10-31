@@ -1,6 +1,6 @@
 import streamlit as st
 from utils.styles import apply_ceritajiwa_styles
-from utils.auth import init_session, clear_all
+from utils.auth import init_session
 
 st.set_page_config(page_title="Cerita Jiwa Training Center", page_icon="🧠", layout="wide", initial_sidebar_state="collapsed")
 apply_ceritajiwa_styles()
@@ -15,7 +15,6 @@ with col2:
 st.divider()
 st.markdown("<h3 style='text-align:center; color:#344A61;'>Menu</h3>", unsafe_allow_html=True)
 
-# MENU BUTTONS - pakai st.button + st.switch_page (lebih stabil)
 c1, c2, c3 = st.columns(3)
 with c1:
     if st.button("📝 Asesmen", use_container_width=True, key="menu_asesmen"):

@@ -1,7 +1,6 @@
 import streamlit as st
 from utils.styles import apply_ceritajiwa_styles
 
-st.set_page_config(page_title="Verifikasi Sertifikasi - Cerita Jiwa", page_icon="🔍", layout="centered")
 apply_ceritajiwa_styles()
 
 st.image("assets/logo_dark.png", width=100)
