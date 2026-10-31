@@ -1,13 +1,13 @@
 import streamlit as st
 import plotly.graph_objects as go
 from utils.styles import apply_ceritajiwa_styles
-from utils.auth import require_role, get_user
+from utils.auth import require_akses, get_peserta
 
 st.set_page_config(page_title="Asesmen - Cerita Jiwa", page_icon="📝", layout="wide")
 apply_ceritajiwa_styles()
-require_role(["peserta", "admin", "trainer"])
+require_akses()
 
-user = get_user()
+peserta = get_peserta()
 
 with st.sidebar:
     st.markdown("<p style='color:white; font-weight:700;'>Menu</p>", unsafe_allow_html=True)
@@ -16,8 +16,8 @@ with st.sidebar:
     st.page_link("pages/05_Ujian.py", label="📋 Ujian")
     st.page_link("pages/06_Sertifikat.py", label="📜 Sertifikat")
 
-st.title("📝 Asesmen CERC")
-st.markdown("Certified Emotional Regulation Coach")
+st.title(f"📝 Asesmen {peserta['sertifikasi']}")
+st.markdown(f"Peserta: **{peserta['nama']}** | Batch: {peserta['batch']}")
 
 progress = st.progress(0, text="Progress: 0%")
 
@@ -77,7 +77,7 @@ if st.button("Submit Asesmen", type="primary"):
     st.download_button(
         label="📥 Download Report PDF",
         data=b"Mock PDF Report Content",
-        file_name="asesmen_cerc_report.pdf",
+        file_name=f"asesmen_{peserta['sertifikasi'].lower()}_report.pdf",
         mime="application/pdf"
     )
 

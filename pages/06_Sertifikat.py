@@ -1,12 +1,12 @@
 import streamlit as st
 from utils.styles import apply_ceritajiwa_styles
-from utils.auth import require_role, get_user
+from utils.auth import require_akses, get_peserta
 
 st.set_page_config(page_title="Sertifikat - Cerita Jiwa", page_icon="📜", layout="wide")
 apply_ceritajiwa_styles()
-require_role(["peserta", "admin", "trainer"])
+require_akses()
 
-user = get_user()
+peserta = get_peserta()
 
 with st.sidebar:
     st.markdown("<p style='color:white; font-weight:700;'>Menu</p>", unsafe_allow_html=True)
@@ -17,16 +17,16 @@ with st.sidebar:
 
 st.title("📜 Hasil & Sertifikat")
 
-st.subheader("CERC - Certified Emotional Regulation Coach")
+st.subheader(f"{peserta['sertifikasi']} - {peserta['nama']}")
 st.markdown("Status: ✅ **LULUS**")
-st.markdown("🏷️ Running Key: **CERC-2026-000089**")
+st.markdown(f"🏷️ Running Key: **{peserta['sertifikasi']}-2026-000089**")
 st.markdown("📅 Tanggal Lulus: 15 Agustus 2026")
 
 col1, col2 = st.columns(2)
 with col1:
-    st.download_button("📥 Download Sertifikat PDF", b"Mock PDF", "sertifikat_cerc.pdf", use_container_width=True)
+    st.download_button("📥 Download Sertifikat PDF", b"Mock PDF", f"sertifikat_{peserta['sertifikasi'].lower()}.pdf", use_container_width=True)
 with col2:
-    st.download_button("🏅 Download Badge", b"Mock PNG", "badge_cerc.png", use_container_width=True)
+    st.download_button("🏅 Download Badge", b"Mock PNG", f"badge_{peserta['sertifikasi'].lower()}.png", use_container_width=True)
 
 st.divider()
 st.subheader("📊 Riwayat Ujian")
@@ -39,4 +39,4 @@ st.table({
 
 st.divider()
 st.subheader("📝 Report Asesmen")
-st.download_button("📥 Download Report Asesmen", b"Mock PDF", "asesmen_cerc_report.pdf", use_container_width=True)
+st.download_button("📥 Download Report Asesmen", b"Mock PDF", f"asesmen_{peserta['sertifikasi'].lower()}_report.pdf", use_container_width=True)

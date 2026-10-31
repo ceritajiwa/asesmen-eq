@@ -1,68 +1,46 @@
 import streamlit as st
 from utils.styles import apply_ceritajiwa_styles, card
-from utils.auth import require_role, get_user, logout_user
+from utils.auth import require_akses, get_peserta, clear_akses
 
 st.set_page_config(page_title="Dashboard - Cerita Jiwa", page_icon="📋", layout="wide")
 apply_ceritajiwa_styles()
-require_role(["peserta", "admin", "trainer"])
+require_akses()
 
-user = get_user()
+peserta = get_peserta()
 
 with st.sidebar:
     st.markdown(f"""
     <div style="text-align:center; padding:10px 0;">
-        <p style="color:white; font-size:16px; font-weight:700; margin:0;">{user['nama']}</p>
-        <p style="color:rgba(255,255,255,0.6); font-size:12px; margin:4px 0 0 0;">{user['email']}</p>
+        <p style="color:white; font-size:16px; font-weight:700; margin:0;">{peserta['nama']}</p>
+        <p style="color:rgba(255,255,255,0.6); font-size:12px; margin:4px 0 0 0;">{peserta['kode']}</p>
     </div>
     <hr style="border-color:rgba(255,255,255,0.15);">
     """, unsafe_allow_html=True)
-    if st.button("🏠 Dashboard", use_container_width=True):
-        st.rerun()
-    if st.button("📝 Asesmen", use_container_width=True):
-        st.switch_page("pages/04_Asesmen.py")
-    if st.button("📋 Ujian", use_container_width=True):
-        st.switch_page("pages/05_Ujian.py")
-    if st.button("📜 Sertifikat", use_container_width=True):
-        st.switch_page("pages/06_Sertifikat.py")
+    
+    st.page_link("pages/03_Dashboard.py", label="🏠 Dashboard", disabled=True)
+    st.page_link("pages/04_Asesmen.py", label="📝 Asesmen")
+    st.page_link("pages/05_Ujian.py", label="📋 Ujian")
+    st.page_link("pages/06_Sertifikat.py", label="📜 Sertifikat")
     st.markdown("<hr style='border-color:rgba(255,255,255,0.15);'>", unsafe_allow_html=True)
-    if st.button("🚪 Logout", use_container_width=True):
-        logout_user()
+    if st.button("🚪 Keluar", use_container_width=True, key="keluar_dashboard"):
+        clear_akses()
         st.switch_page("app.py")
 
 st.title("Dashboard Peserta")
-st.markdown(f"Selamat datang, **{user['nama']}**!")
-
-if st.session_state.get("is_first_login", False):
-    st.warning("⚠️ Ini adalah login pertama Anda. Silakan ganti password untuk keamanan.")
-    with st.form("change_password"):
-        new_pass = st.text_input("Password Baru", type="password")
-        confirm_pass = st.text_input("Konfirmasi Password", type="password")
-        if st.form_submit_button("Simpan Password", type="primary"):
-            if new_pass != confirm_pass:
-                st.error("Password tidak cocok!")
-            elif len(new_pass) < 6:
-                st.error("Password minimal 6 karakter!")
-            else:
-                st.session_state.is_first_login = False
-                st.success("Password berhasil diubah!")
-                st.rerun()
+st.markdown(f"Selamat datang, **{peserta['nama']}**!")
+st.caption(f"Sertifikasi: {peserta['sertifikasi']} | Batch: {peserta['batch']}")
 
 st.subheader("Sertifikasi Saya")
+
 col1, col2 = st.columns(2)
 
 with col1:
-    card("CERC", "Certified Emotional Regulation Coach<br>Batch: Agustus 2026", "active")
-    c1, c2 = st.columns(2)
-    with c1:
-        if st.button("📝 Mulai Asesmen", use_container_width=True):
-            st.switch_page("pages/04_Asesmen.py")
-    with c2:
-        if st.button("📋 Mulai Ujian", use_container_width=True):
-            st.switch_page("pages/05_Ujian.py")
+    card(peserta['sertifikasi'], f"{peserta['sertifikasi']} - Batch: {peserta['batch']}", "active")
+    st.page_link("pages/04_Asesmen.py", label="📝 Mulai Asesmen")
+    st.page_link("pages/05_Ujian.py", label="📋 Mulai Ujian")
 
 with col2:
-    card("CMBC", "Certified Money Behavior Coach", "locked")
-    st.link_button("💳 Beli di Mayar", "https://app.mayar.id", use_container_width=True)
+    card("Info", "Asesmen: Pukul 08:00 WIB<br>Ujian: Pukul 16:00 WIB<br>Training: 09:00 - 16:00 WIB", "pending")
 
 st.divider()
 st.info("""
@@ -70,4 +48,6 @@ st.info("""
 - 📝 Asesmen: 08:00 WIB
 - 📚 Training: 09:00 - 16:00 WIB
 - 📋 Ujian: 16:00 WIB
+
+Silakan kerjakan asesmen terlebih dahulu sebelum training dimulai.
 """)
