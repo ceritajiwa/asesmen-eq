@@ -33,27 +33,32 @@ def _narrow():
 def _form_kode_akses(page_title: str):
     with _narrow():
         st.image("assets/logo_dark.png", width=96)
-        page_header(page_title, "Pilih training lalu masukkan kode akses dari trainer.", eyebrow="Langkah 1 dari 2")
+        page_header(page_title, "Pilih training Anda. Kalau training-nya memakai kode akses, masukkan kode dari trainer.",
+                    eyebrow="Langkah 1 dari 2")
 
         try:
-            trainings = get_trainings(only_active=True)
+            trainings = get_trainings()
         except (DatabaseError, SupabaseNotConfigured) as e:
             show_db_error(e)
             st.stop()
 
         if not trainings:
-            st.info("Belum ada training yang dibuka saat ini.")
+            st.info("Belum ada training terdaftar. Admin bisa menambahkannya di menu Admin.")
             st.stop()
 
         options = {t["id"]: training_label(t) for t in trainings}
-        with st.form("form_kode_akses", border=True):
-            selected = st.selectbox("Pilih Training", options=list(options.keys()),
-                                    format_func=lambda x: options[x])
-            kode = st.text_input("Kode Akses", placeholder="Masukkan kode dari trainer")
-            submit = st.form_submit_button("Masuk", type="primary", width="stretch")
+        with st.container(border=True, key="card_gate"):
+            selected = st.selectbox("Pilih Perusahaan / Training", options=list(options.keys()),
+                                    format_func=lambda x: options[x], key="gate_training")
+            pilih = next(t for t in trainings if t["id"] == selected)
+            kode = ""
+            if pilih["perlu_kode"]:
+                kode = st.text_input("Kode Akses", type="password", placeholder="Masukkan kode dari trainer",
+                                     key=f"gate_kode_{selected}")
+            masuk = st.button("Masuk", type="primary", width="stretch", key="gate_masuk")
 
-        if submit:
-            if not kode.strip():
+        if masuk:
+            if pilih["perlu_kode"] and not kode.strip():
                 st.error("Kode akses wajib diisi.")
             else:
                 try:
@@ -65,7 +70,7 @@ def _form_kode_akses(page_title: str):
                     set_training_session(data)
                     st.rerun()
                 else:
-                    st.error("Kode akses tidak cocok untuk training ini. Cek lagi huruf dan angkanya, ya.")
+                    st.error("Kode akses salah. Coba lagi atau hubungi trainer Anda.")
     footer()
     st.stop()
 
@@ -128,7 +133,6 @@ def peserta_sidebar(page_key: str):
             f"<div style='padding:6px 0 4px;'>"
             f"<p style='font-size:16px; font-weight:800; margin:0;'>{esc(peserta['nama'])}</p>"
             f"<p style='opacity:.7; font-size:12px; margin:2px 0 0;'>{esc(training['nama'])}</p>"
-            f"<p style='opacity:.7; font-size:12px; margin:0;'>Kode: {esc(training['kode'])}</p>"
             f"</div><hr>",
             unsafe_allow_html=True,
         )

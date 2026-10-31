@@ -1,91 +1,161 @@
-import json
-
 import streamlit as st
-import streamlit.components.v1 as components
 
-from cjlib.db import DatabaseError, simpan_ujian
-from cjlib.konten import paket_ujian_untuk
-from cjlib.styles import footer, page_header
-from cjlib.ui import peserta_sidebar, require_peserta_gate, show_db_error, subjudul
+from cjlib.db import simpan_ujian
+from cjlib.styles import esc, footer, page_header
+from cjlib.ui import peserta_sidebar, require_peserta_gate, subjudul
+from questions import EXAM_PACKAGES
 
 training, peserta = require_peserta_gate("📋 Ujian")
 peserta_sidebar("ujian")
 
-kode_paket, paket = paket_ujian_untuk(training)
-soal_list = paket["soal"]
-durasi = int(paket.get("durasi_menit", 45))
-nilai_lulus = int(paket.get("nilai_lulus", 80))
+page_header("📋 Ujian Sertifikasi", subjudul(training, peserta))
 
-col1, col2 = st.columns([3, 1])
-with col1:
-    page_header(f"📋 Ujian {training['sertifikasi'] or ''}", subjudul(training, peserta))
-with col2:
-    # Hitung mundur berjalan di browser saja, jadi halaman tidak reload
-    timer_key = json.dumps(f"cj_ujian_{training['id']}_{peserta['email']}")
-    components.html(
-        f"""
-        <div style="font-family:sans-serif; text-align:right; color:#344A61;">
-          <div style="font-size:13px; color:#6D6F71;">⏱️ Sisa Waktu</div>
-          <div id="t" style="font-size:30px; font-weight:800;">{durasi:02d}:00</div>
-        </div>
-        <script>
-          const key = {timer_key};
-          let end = 0;
-          try {{ end = Number(sessionStorage.getItem(key)) || 0; }} catch (e) {{}}
-          if (!end) {{ end = Date.now() + {durasi} * 60000; try {{ sessionStorage.setItem(key, end); }} catch (e) {{}} }}
-          const el = document.getElementById("t");
-          const tick = () => {{
-            const s = Math.max(0, Math.round((end - Date.now()) / 1000));
-            el.textContent = String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
-            if (s === 0) {{ el.style.color = "#C0392B"; el.textContent = "Waktu habis"; }}
-          }};
-          tick(); setInterval(tick, 1000);
-        </script>
-        """,
-        height=80,
-    )
+# ---------------- Pilih paket ----------------
+pkg_keys = list(EXAM_PACKAGES.keys())
+default_pkg = training.get("sertifikasi") if training.get("sertifikasi") in EXAM_PACKAGES else pkg_keys[0]
+if "exam_result" not in st.session_state and "exam_retry" not in st.session_state:
+    pkg_key = st.selectbox("Pilih Paket Ujian", pkg_keys, index=pkg_keys.index(default_pkg),
+                           format_func=lambda k: EXAM_PACKAGES[k]["title"], key="exam_pkg")
+else:
+    pkg_key = (st.session_state.get("exam_result") or st.session_state.get("exam_retry"))["pkg"]
+pkg = EXAM_PACKAGES[pkg_key]
+SOAL = pkg["questions"]
+N = len(SOAL)
+LULUS = pkg["passing"]
+SESI = pkg["sessions"]
 
-if paket.get("demo"):
-    st.info("Ini **soal contoh**. Nilai bisa dilihat, tapi tidak disimpan ke database.")
 
-st.caption(f"Ada {len(soal_list)} soal. Semua ada di halaman ini, cukup scroll ke bawah. "
-           f"Nilai minimum lulus {nilai_lulus}. Jawaban baru dikirim setelah tombol **Submit Ujian** ditekan.")
+def _opsi(q):
+    return [f"{chr(65 + i)}. {o}" for i, o in enumerate(q["opts"])]
 
-# ---------------- Semua soal dalam satu form (tidak reload sampai submit) ----------------
+
+def _render_soal(daftar, prefix):
+    """Semua soal dikelompokkan per sesi, tampil terbuka (tanpa expander)."""
+    per_sesi = {}
+    for q in daftar:
+        per_sesi.setdefault(int(q["session"]), []).append(q)
+    for s in sorted(per_sesi):
+        qs = per_sesi[s]
+        with st.container(border=True, key=f"card_{prefix}_sesi_{s}"):
+            st.subheader(SESI.get(str(s), f"Sesi {s}"))
+            for q in qs:
+                st.radio(f"**{q['n']}.** {q['q']}", _opsi(q), key=f"{prefix}_{pkg_key}_{q['n']}", index=None)
+
+
+def _kumpulkan(daftar, prefix):
+    jawaban = {}
+    for q in daftar:
+        v = st.session_state.get(f"{prefix}_{pkg_key}_{q['n']}")
+        if v is not None:
+            jawaban[q["n"]] = ord(v[0]) - 65
+    return jawaban
+
+
+def _simpan(benar):
+    nilai = round(benar / N * 100)
+    lulus = nilai >= LULUS
+    try:
+        simpan_ujian(training["id"], peserta["nama"], peserta["email"], benar, nilai, lulus, pkg_key)
+    except Exception as e:  # noqa: BLE001
+        st.warning(f"Nilai belum tersimpan ke database: {e}")
+    return nilai, lulus
+
+
+# ---------------- Hasil ujian ----------------
+if "exam_result" in st.session_state:
+    r = st.session_state["exam_result"]
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Nilai", f"{r['score']}")
+    c2.metric("Benar", f"{r['correct']} / {N}")
+    c3.metric("Status", "LULUS ✅" if r["passed"] else "BELUM LULUS ❌")
+    if r["passed"]:
+        st.success(f"Selamat, **{peserta['nama']}**! Anda dinyatakan LULUS {pkg['title']}. "
+                   "Sertifikat bisa diunduh di menu 📜 Sertifikat.")
+        if not r.get("balon"):
+            st.balloons()
+            r["balon"] = True
+    else:
+        st.error(f"Nilai Anda {r['score']}, belum mencapai {LULUS}. Pelajari kembali materinya, "
+                 "lalu ulangi ujian. Boleh mengulang tanpa batas.")
+
+    salah = [q["n"] for q in SOAL if r["answers"].get(q["n"]) != q["key"]]
+    cc1, cc2, cc3 = st.columns(3)
+    if not r["passed"] and salah:
+        if cc1.button(f"🎯 Ulangi {len(salah)} Soal Salah", type="primary", width="stretch"):
+            st.session_state["exam_retry"] = dict(pkg=pkg_key, wrong=salah, keep=r["correct"], prev=dict(r["answers"]))
+            del st.session_state["exam_result"]
+            st.rerun()
+    if cc2.button(f"🔁 Ulang Semua ({N} Soal)", width="stretch"):
+        del st.session_state["exam_result"]
+        for q in SOAL:
+            st.session_state.pop(f"uj_{pkg_key}_{q['n']}", None)
+        st.rerun()
+    if cc3.button("Selesai", width="stretch"):
+        del st.session_state["exam_result"]
+        st.switch_page("views/sertifikat.py" if r["passed"] else "views/beranda.py")
+
+    st.divider()
+    st.subheader("📋 Review Jawaban")
+    for q in SOAL:
+        ua = r["answers"].get(q["n"])
+        ok = ua == q["key"]
+        st.markdown(f"**{q['n']}. {'✅' if ok else '❌'}** {esc(q['q'])}")
+        for i, opt in enumerate(q["opts"]):
+            mark = ""
+            if i == q["key"]:
+                mark = "  ✅ **(jawaban benar)**"
+            elif ua is not None and i == ua:
+                mark = "  ❌ **(jawaban Anda)**"
+            st.markdown(f"- {chr(65 + i)}. {opt}{mark}")
+    footer()
+    st.stop()
+
+# ---------------- Mode perbaikan: hanya soal yang salah ----------------
+if "exam_retry" in st.session_state:
+    rz = st.session_state["exam_retry"]
+    rq = [q for q in SOAL if q["n"] in rz["wrong"]]
+    st.info(f"🎯 **Mode Perbaikan**: {len(rq)} soal yang sebelumnya salah. "
+            f"Benar sebelumnya: {rz['keep']}/{N}. Jawab ulang, lalu kumpulkan.")
+    with st.form("form_retry", border=False):
+        _render_soal(rq, "retry")
+        kirim_r = st.form_submit_button("✅ Kumpulkan Perbaikan", type="primary", width="stretch")
+    if kirim_r:
+        jr = _kumpulkan(rq, "retry")
+        if len(jr) < len(rq):
+            st.error(f"Masih ada {len(rq) - len(jr)} soal belum dijawab.")
+        else:
+            total_benar = rz["keep"] + sum(1 for q in rq if jr.get(q["n"]) == q["key"])
+            nilai, lulus = _simpan(total_benar)
+            merged = dict(rz["prev"])
+            merged.update(jr)
+            for q in rq:
+                st.session_state.pop(f"retry_{pkg_key}_{q['n']}", None)
+            st.session_state["exam_result"] = dict(answers=merged, correct=total_benar, score=nilai,
+                                                   passed=lulus, pkg=pkg_key)
+            del st.session_state["exam_retry"]
+            st.rerun()
+    footer()
+    st.stop()
+
+# ---------------- Ujian lengkap ----------------
+st.caption(f"{N} soal pilihan ganda (studi kasus). Nilai kelulusan **{LULUS}** "
+           f"(minimal {round(LULUS / 100 * N)} benar). Boleh mengulang sampai lulus. "
+           "Semua soal ada di halaman ini, jawaban baru dikirim setelah tombol **Kumpulkan Jawaban** ditekan.")
+
 with st.form("form_ujian", border=False):
-    for i, s in enumerate(soal_list):
-        with st.container(border=True, key=f"card_soal_{i}"):
-            st.markdown(f"**Soal {i + 1}**")
-            st.radio(s["soal"], s["opsi"], index=None, key=f"uj_{kode_paket}_{i}")
-    kirim = st.form_submit_button("✅ Submit Ujian", type="primary", width="stretch")
+    _render_soal(SOAL, "uj")
+    kirim = st.form_submit_button("✅ Kumpulkan Jawaban", type="primary", width="stretch")
 
 if kirim:
-    kosong = [i + 1 for i in range(len(soal_list)) if st.session_state.get(f"uj_{kode_paket}_{i}") is None]
-    if kosong:
-        st.error(f"Masih ada {len(kosong)} soal yang belum dijawab: nomor " + ", ".join(map(str, kosong)) + ".")
+    jawaban = _kumpulkan(SOAL, "uj")
+    if len(jawaban) < N:
+        belum = [str(q["n"]) for q in SOAL if q["n"] not in jawaban]
+        st.error(f"Masih ada {len(belum)} soal belum dijawab: nomor {', '.join(belum[:15])}"
+                 + (" dan lainnya" if len(belum) > 15 else "") + ". Jawaban yang sudah diisi tetap ada.")
     else:
-        benar = sum(
-            1 for i, s in enumerate(soal_list)
-            if s["opsi"].index(st.session_state[f"uj_{kode_paket}_{i}"]) == s["kunci"]
-        )
-        nilai = round(benar / len(soal_list) * 100)
-        lulus = nilai >= nilai_lulus
-        st.session_state.ujian_attempts += 1
-        st.session_state.current_nilai = nilai
-
-        if not paket.get("demo"):
-            try:
-                simpan_ujian(training["id"], peserta["nama"], peserta["email"], benar, nilai, lulus, kode_paket)
-            except DatabaseError as e:
-                show_db_error(e)
-                st.stop()
-
-        if lulus:
-            st.success(f"🎉 Selamat! Anda lulus dengan nilai {nilai} ({benar} dari {len(soal_list)} benar).")
-            st.balloons()
-            st.markdown("Sertifikat bisa diunduh di menu **📜 Sertifikat**.")
-        else:
-            st.warning(f"Nilai Anda: {nilai} ({benar} dari {len(soal_list)} benar). Belum memenuhi minimum {nilai_lulus}.")
-            st.info(f"Percobaan ke-{st.session_state.ujian_attempts}. Silakan perbaiki jawaban di atas lalu submit lagi.")
+        benar = sum(1 for q in SOAL if jawaban.get(q["n"]) == q["key"])
+        nilai, lulus = _simpan(benar)
+        st.session_state["exam_result"] = dict(answers=jawaban, correct=benar, score=nilai, passed=lulus, pkg=pkg_key)
+        st.rerun()
 
 footer()

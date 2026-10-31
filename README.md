@@ -1,54 +1,39 @@
-# Cerita Jiwa Training Center
+# Cerita Jiwa Training Center (Asesmen EQ)
 
-Aplikasi Streamlit untuk asesmen, training, ujian, dan sertifikat Cerita Jiwa.
+Aplikasi Streamlit + Supabase untuk asesmen, ujian sertifikasi, sertifikat, dan catatan sesi BEI.
 
 ## Struktur
 
 ```
-app.py                  # entrypoint + daftar menu (st.navigation)
-views/                  # isi tiap halaman
-cjlib/db.py             # semua akses ke Supabase
-cjlib/konten.py         # BANK SOAL asesmen & ujian (isi soal asli di sini)
-cjlib/pdf.py            # pembuat PDF laporan, sertifikat, dan badge
-cjlib/ui.py                # form kode akses + data peserta (dipakai 4 halaman peserta)
-cjlib/auth.py           # session & cek password
-cjlib/styles.py         # tampilan (warna brand, font, komponen)
-supabase/               # query bantu untuk cek struktur database
+app.py              # entrypoint + daftar menu (st.navigation)
+views/              # halaman: beranda, asesmen, training, ujian, sertifikat, verifikasi, admin, trainer
+cjlib/              # kode bersama: db (Supabase), ui (form kode akses), hasil (tampilan hasil asesmen),
+                    #   pdf (sertifikat & badge), auth, styles
+instruments.py      # BANK ITEM ASESMEN (PSS, MBI, WLEIS, UWES, TIS, PSQ, BFI, dst.)
+questions.py        # BANK SOAL UJIAN per paket (CERC, CBT, ...)
+scoring.py          # skoring 0-100 per dimensi
+insights.py, hr_analytics.py, charts.py, pdf_report.py   # interpretasi, analitik HR, grafik, PDF laporan
+bei.py              # sesi konseling BEI + strukturisasi AI (Gemini / Groq)
 ```
 
-> Folder `pages/` versi lama **dihapus**. Kalau masih ada di GitHub, hapus saja; aplikasi sudah tidak memakainya.
+Folder `pages/` dan `utils/` versi lama sudah tidak dipakai. **Hapus dari GitHub** kalau masih ada.
 
-## Menu & Akses
+## Menu
 
-| Menu | Cara Akses |
-|------|-----------|
-| 🏠 Beranda | Bebas |
-| 📝 Asesmen | Pilih Training → Kode Akses Training → Nama & Email |
-| 🎓 Training | Pilih Training → Kode Akses Training → Nama & Email |
-| 📋 Ujian | Pilih Training → Kode Akses Training → Nama & Email |
-| 📜 Sertifikat | Pilih Training → Kode Akses Training → Nama & Email |
-| 🔍 Cek Sertifikasi | Publik |
-| ⚙️ Admin | Password Admin |
-| 👨‍🏫 Trainer / BEI | Password Trainer |
+| Menu | Akses | Isi |
+|---|---|---|
+| 🏠 Beranda | Publik | Menu utama |
+| 📝 Asesmen | Pilih training (+ kode akses bila ada) → nama & email | Semua instrumen yang dipilih admin, satu halaman |
+| 🎓 Training | sama | Info training |
+| 📋 Ujian | sama | Paket ujian 40 soal, satu halaman, review jawaban, ulangi soal salah |
+| 📜 Sertifikat | sama | Sertifikat PDF, badge, riwayat ujian, report asesmen |
+| 🔍 Cek Sertifikasi | Publik | Cari nama / nomor sertifikat |
+| ⚙️ Admin | Password admin | Report perusahaan & individu, kelola training, data dummy, riwayat ujian |
+| 👨‍🏫 Trainer / BEI | Password trainer | Catatan sesi konseling + AI |
 
-## Database (Supabase, schema `public`)
-
-| Tabel | Dipakai untuk |
-|---|---|
-| `trainings` | Daftar training & kode akses (`name`, `access_code`) |
-| `respondents` | Data peserta yang mengisi asesmen |
-| `exam_attempts` | Hasil ujian, status lulus, nomor sertifikat (CERC-2026-<id>) |
-| `responses` | Jawaban asesmen (per item) |
-| `bei_sessions` | Belum dipakai di versi ini |
-
-Aturan kode akses:
-- Training **dibuka** kalau `access_code` terisi, **ditutup** kalau kosong.
-- Huruf besar/kecil dan spasi di awal/akhir kode diabaikan saat peserta mengetik.
-- Admin bisa membuat training baru, membuat ulang kode, atau menutup akses dari menu Admin.
+Kode akses: kalau `access_code` sebuah training dikosongkan, training itu publik (tanpa kode).
 
 ## Secrets (Streamlit Cloud > Manage app > Settings > Secrets)
-
-Isi di Streamlit Cloud, **jangan** ditulis di repo:
 
 ```toml
 SUPABASE_URL = "https://xxxx.supabase.co"
@@ -58,3 +43,5 @@ TRAINER_PASSWORD = "..."   # kalau kosong, pakai ADMIN_PASSWORD
 GEMINI_API_KEY = "..."
 GROQ_API_KEY = "..."
 ```
+
+Jangan tulis password atau key di file mana pun di repo, karena repo ini publik.

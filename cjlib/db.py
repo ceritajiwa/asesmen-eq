@@ -1,38 +1,36 @@
 """
-Akses data Supabase untuk aplikasi Cerita Jiwa Training Center.
+Akses Supabase untuk aplikasi Cerita Jiwa Training Center.
 
-Struktur yang dipakai (schema public):
-  trainings      : id (uuid), name, access_code, created_at, enabled_instruments
-  responses      : id, respondent_id, instrument, item_n, score
-  respondents    : id, training_id, full_name, email, department, job_level, created_at
-  exam_attempts  : id, training_id, full_name, email, correct, score, passed, created_at, package
-
-Aturan kode akses:
-  - Training dianggap TERBUKA kalau kolom access_code terisi.
-  - Training TERTUTUP kalau access_code kosong (NULL), tidak muncul di pilihan peserta.
+Aturan (sama seperti aplikasi asli):
+  - trainings.access_code kosong  -> training PUBLIK, peserta tidak perlu kode.
+  - trainings.access_code terisi  -> peserta wajib memasukkan kode itu.
+  - trainings.enabled_instruments -> JSON list kunci instrumen, contoh ["PSS","MBI"].
+                                      Kosong = semua instrumen.
 """
 import hmac
+import json
 import re
-import secrets
-import string
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
 import streamlit as st
 
 from cjlib.supabase_client import get_supabase
+from instruments import INSTRUMENTS
+from questions import EXAM_PACKAGES
 
-TRAINING_TABLE = "trainings"
-RESPONDENT_TABLE = "respondents"
-RESPONSE_TABLE = "responses"
-EXAM_TABLE = "exam_attempts"
-
-SERTIFIKASI_LIST = ["CERC", "CMBC", "CPSC", "CPPC", "CRWC", "CCTC"]
 WIB = ZoneInfo("Asia/Jakarta")
+ALL_KEYS = [i["key"] for i in INSTRUMENTS]
+INST_MAP = {i["key"]: i for i in INSTRUMENTS}
+SERTIFIKASI_LIST = ["CERC", "CMBC", "CPSC", "CPPC", "CRWC", "CCTC"]
 
 
 class DatabaseError(Exception):
     pass
+
+
+def sb():
+    return get_supabase()
 
 
 # ----------------------------------------------------------------------------
@@ -61,266 +59,194 @@ def format_tanggal(value, with_time=False) -> str:
     return f"{teks}, {dt:%H:%M}" if with_time else teks
 
 
-def _tebak_sertifikasi(nama: str) -> str:
-    """Ambil kode sertifikasi dari nama training, misal 'CERC - PT Maju Jaya' -> 'CERC'."""
+def tebak_sertifikasi(nama: str) -> str:
     upper = (nama or "").upper()
-    for kode in SERTIFIKASI_LIST:
-        if re.search(rf"\b{kode}\b", upper):
+    for kode in list(EXAM_PACKAGES.keys()) + SERTIFIKASI_LIST:
+        if re.search(rf"\b{re.escape(kode)}\b", upper):
             return kode
     return ""
 
 
+def get_enabled(training: dict) -> list[str]:
+    """Kunci instrumen yang dipilih admin untuk training ini (urutan mengikuti bank item)."""
+    raw = training.get("enabled_instruments") if training is not None else None
+    if raw is None or (isinstance(raw, float) and raw != raw) or raw == "":
+        return list(ALL_KEYS)
+    try:
+        data = raw if isinstance(raw, list) else json.loads(raw)
+        keys = [k for k in ALL_KEYS if k in data]
+        return keys or list(ALL_KEYS)
+    except Exception:  # noqa: BLE001
+        return list(ALL_KEYS)
+
+
 def _normalize(row: dict) -> dict:
-    """Ubah 1 baris tabel trainings ke format yang dipakai halaman-halaman aplikasi.
-    Kalau nama training ditulis 'SERTIFIKASI - PERUSAHAAN - BATCH' (format dari menu Admin),
-    perusahaan & batch ikut terbaca. Kalau formatnya lain, cukup nama training saja yang tampil."""
     nama = row.get("name") or ""
     bagian = [b.strip() for b in nama.split(" - ")]
-    perusahaan = bagian[1] if len(bagian) >= 3 else ""
-    batch = bagian[2] if len(bagian) >= 3 else ""
     return {
-        "id": row.get("id"),
+        **row,
         "nama": nama,
         "kode_akses": row.get("access_code"),
-        "sertifikasi": _tebak_sertifikasi(nama),
-        "perusahaan": perusahaan,
-        "batch": batch,
-        "tanggal": row.get("created_at"),
-        "aktif": bool(normalize_kode(row.get("access_code"))),
-        "instrumen": parse_instrumen(row.get("enabled_instruments")),
+        "perlu_kode": bool(normalize_kode(row.get("access_code"))),
+        "sertifikasi": tebak_sertifikasi(nama),
+        "perusahaan": bagian[1] if len(bagian) >= 3 else "",
+        "batch": bagian[2] if len(bagian) >= 3 else "",
     }
-
-
-def parse_instrumen(value) -> list[str]:
-    """enabled_instruments bisa berupa 'A,B', '["A","B"]', atau '{A,B}'. Hasil: ['A', 'B']."""
-    if not value:
-        return []
-    if isinstance(value, (list, tuple)):
-        items = value
-    else:
-        teks = str(value).strip().strip("[]{}")
-        items = re.split(r"[,;\n]", teks)
-    return [str(i).strip().strip('"').strip("'") for i in items if str(i).strip().strip('"').strip("'")]
 
 
 # ----------------------------------------------------------------------------
 # Trainings
 # ----------------------------------------------------------------------------
+def fetch_trainings_raw() -> list[dict]:
+    """Baris mentah tabel trainings (dipakai halaman Admin & Trainer)."""
+    return sb().table("trainings").select("*").order("name").execute().data or []
+
+
 @st.cache_data(ttl=60, show_spinner=False)
-def get_trainings(only_active: bool = True) -> list[dict]:
+def get_trainings() -> list[dict]:
     try:
-        res = (
-            get_supabase().table(TRAINING_TABLE)
-            .select("id, name, access_code, created_at, enabled_instruments")
-            .order("created_at", desc=True)
-            .execute()
-        )
+        rows = fetch_trainings_raw()
     except Exception as e:  # noqa: BLE001
         raise DatabaseError(str(e)) from e
-    rows = [_normalize(r) for r in (res.data or [])]
-    return [r for r in rows if r["aktif"]] if only_active else rows
+    return [_normalize(r) for r in rows]
 
 
 def training_label(t: dict) -> str:
-    return t.get("nama") or "(tanpa nama)"
+    return t.get("nama") or t.get("name") or "(tanpa nama)"
+
+
+def ambil_training(training_id) -> dict | None:
+    try:
+        res = sb().table("trainings").select("*").eq("id", training_id).limit(1).execute()
+    except Exception as e:  # noqa: BLE001
+        raise DatabaseError(str(e)) from e
+    return _normalize(res.data[0]) if res.data else None
 
 
 def verifikasi_kode_akses(training_id, kode_input: str) -> dict | None:
-    """Dicek langsung ke database (tanpa cache) supaya kode yang baru diganti langsung berlaku."""
-    kode_input = normalize_kode(kode_input)
-    if not kode_input:
+    """Dicek langsung ke database supaya perubahan kode dari Admin langsung berlaku.
+    Training tanpa kode akses selalu lolos (publik)."""
+    t = ambil_training(training_id)
+    if not t:
         return None
-    try:
-        res = (
-            get_supabase().table(TRAINING_TABLE)
-            .select("id, name, access_code, created_at, enabled_instruments")
-            .eq("id", training_id).limit(1).execute()
-        )
-    except Exception as e:  # noqa: BLE001
-        raise DatabaseError(str(e)) from e
-    if not res.data:
-        return None
-    t = _normalize(res.data[0])
-    if t["aktif"] and hmac.compare_digest(normalize_kode(t["kode_akses"]).encode(), kode_input.encode()):
+    if not t["perlu_kode"]:
+        return t
+    if hmac.compare_digest(normalize_kode(t["kode_akses"]).encode(), normalize_kode(kode_input).encode()):
         return t
     return None
 
 
-def _kode_sudah_ada(kode: str) -> bool:
-    res = get_supabase().table(TRAINING_TABLE).select("id").eq("access_code", kode).limit(1).execute()
-    return bool(res.data)
+# ----------------------------------------------------------------------------
+# Respondents / responses (asesmen)
+# ----------------------------------------------------------------------------
+def fetch_respondents(training_id) -> list[dict]:
+    return sb().table("respondents").select("*").eq("training_id", training_id).execute().data or []
 
 
-def generate_kode_akses(sertifikasi: str = "", batch: str = "") -> str:
-    """Format: CERC-AGU-4821. Dicek dulu supaya tidak dobel di database."""
-    prefix = sertifikasi or "CJ"
-    huruf = "".join(ch for ch in (batch or "").upper() if ch.isalpha())[:3]
-    for _ in range(20):
-        tengah = huruf or "".join(secrets.choice(string.ascii_uppercase) for _ in range(3))
-        angka = "".join(secrets.choice(string.digits) for _ in range(4))
-        kode = f"{prefix}-{tengah}-{angka}"
-        if not _kode_sudah_ada(kode):
-            return kode
-    raise DatabaseError("Gagal membuat kode akses unik, coba lagi.")
+def fetch_responses(ids) -> list[dict]:
+    """Ambil SEMUA baris responses (Supabase membatasi ~1000 baris per query, jadi pakai pagination)."""
+    if not ids:
+        return []
+    all_rows, PAGE = [], 1000
+    for i in range(0, len(ids), 200):
+        part = ids[i:i + 200]
+        offset = 0
+        while True:
+            res = (sb().table("responses").select("*").in_("respondent_id", part)
+                   .order("id").range(offset, offset + PAGE - 1).execute())
+            rows = res.data or []
+            all_rows.extend(rows)
+            if len(rows) < PAGE:
+                break
+            offset += PAGE
+    return all_rows
 
 
-def create_training(sertifikasi: str, perusahaan: str, batch: str) -> dict:
-    nama = f"{sertifikasi} - {perusahaan} - {batch}"
-    try:
-        kode = generate_kode_akses(sertifikasi, batch)
-        res = get_supabase().table(TRAINING_TABLE).insert({"name": nama, "access_code": kode}).execute()
-    except DatabaseError:
-        raise
-    except Exception as e:  # noqa: BLE001
-        raise DatabaseError(str(e)) from e
-    get_trainings.clear()
-    return _normalize(res.data[0]) if res.data else {"nama": nama, "kode_akses": kode}
+def cari_respondent(training_id, email) -> dict | None:
+    res = (sb().table("respondents").select("*").eq("training_id", training_id)
+           .eq("email", (email or "").strip().lower()).order("created_at", desc=True).limit(1).execute())
+    return res.data[0] if res.data else None
 
 
-def set_kode_akses(training: dict, buka: bool) -> str | None:
-    """buka=True  -> buat kode akses baru (menggantikan kode lama).
-    buka=False -> hapus kode akses, training tertutup untuk peserta."""
-    try:
-        kode = generate_kode_akses(training.get("sertifikasi"), training.get("batch")) if buka else None
-        get_supabase().table(TRAINING_TABLE).update({"access_code": kode}).eq("id", training["id"]).execute()
-    except DatabaseError:
-        raise
-    except Exception as e:  # noqa: BLE001
-        raise DatabaseError(str(e)) from e
-    get_trainings.clear()
-    return kode
+def jawaban_respondent(respondent_id) -> list[dict]:
+    return sb().table("responses").select("*").eq("respondent_id", respondent_id).execute().data or []
+
+
+def simpan_asesmen(training_id, nama, email, dept, job_level, answers: dict) -> str:
+    """answers: {(inst_key, item_n): skor_mentah}. Mengembalikan respondent_id."""
+    ins = sb().table("respondents").insert(dict(
+        training_id=training_id, full_name=nama.strip(), email=email.strip().lower(),
+        department=(dept or "").strip() or None, job_level=job_level)).execute()
+    rid = ins.data[0]["id"]
+    rows = [dict(respondent_id=rid, instrument=k[0], item_n=k[1], score=v) for k, v in answers.items()]
+    for i in range(0, len(rows), 500):
+        sb().table("responses").insert(rows[i:i + 500]).execute()
+    return rid
 
 
 # ----------------------------------------------------------------------------
-# Statistik & riwayat (hanya membaca)
+# Ujian & sertifikat
 # ----------------------------------------------------------------------------
-@st.cache_data(ttl=60, show_spinner=False)
-def hitung_statistik() -> dict:
-    """Total peserta (respondents) & jumlah peserta lulus (exam_attempts.passed). None kalau gagal dibaca."""
-    hasil = {"peserta": None, "lulus": None}
-    sb = get_supabase()
-    try:
-        res = sb.table(RESPONDENT_TABLE).select("id", count="exact").limit(1).execute()
-        hasil["peserta"] = res.count
-    except Exception:  # noqa: BLE001
-        pass
-    try:
-        res = sb.table(EXAM_TABLE).select("training_id, email").eq("passed", True).execute()
-        hasil["lulus"] = len({(r["training_id"], (r["email"] or "").lower()) for r in (res.data or [])})
-    except Exception:  # noqa: BLE001
-        pass
-    return hasil
+def simpan_ujian(training_id, nama, email, benar, nilai, lulus, paket) -> None:
+    sb().table("exam_attempts").insert(dict(
+        training_id=training_id, full_name=nama.strip(), email=email.strip().lower(),
+        correct=int(benar), score=int(nilai), passed=bool(lulus), package=paket)).execute()
 
 
 def riwayat_ujian(training_id, email: str) -> list[dict]:
     try:
-        res = (
-            get_supabase().table(EXAM_TABLE)
-            .select("id, score, correct, passed, created_at, package")
-            .eq("training_id", training_id)
-            .ilike("email", (email or "").strip())
-            .order("created_at")
-            .execute()
-        )
+        res = (sb().table("exam_attempts").select("*").eq("training_id", training_id)
+               .ilike("email", (email or "").strip()).order("created_at").execute())
     except Exception as e:  # noqa: BLE001
         raise DatabaseError(str(e)) from e
     return res.data or []
 
 
-def nomor_sertifikat(sertifikasi: str, attempt: dict) -> str:
+def nomor_sertifikat(attempt: dict, fallback_kode: str = "") -> str:
     """Nomor unik dari id baris exam_attempts, contoh: CERC-2026-000089."""
+    kode = attempt.get("package") or fallback_kode or "CJ"
     dt = _parse_waktu(attempt.get("created_at"))
     tahun = dt.year if dt else datetime.now(WIB).year
-    return f"{sertifikasi or 'CJ'}-{tahun}-{int(attempt.get('id') or 0):06d}"
+    return f"{kode}-{tahun}-{int(attempt.get('id') or 0):06d}"
 
 
-def simpan_ujian(training_id, nama, email, benar, nilai, lulus, paket=None) -> dict:
-    try:
-        res = get_supabase().table(EXAM_TABLE).insert({
-            "training_id": training_id, "full_name": nama, "email": email,
-            "correct": int(benar), "score": int(nilai), "passed": bool(lulus), "package": paket,
-        }).execute()
-    except Exception as e:  # noqa: BLE001
-        raise DatabaseError(str(e)) from e
-    hitung_statistik.clear()
-    return res.data[0] if res.data else {}
-
-
-def _cari_respondent(training_id, email):
-    res = (get_supabase().table(RESPONDENT_TABLE).select("id, full_name, email")
-           .eq("training_id", training_id).ilike("email", (email or "").strip())
-           .order("created_at", desc=True).limit(1).execute())
-    return res.data[0] if res.data else None
-
-
-def simpan_asesmen(training_id, nama, email, jawaban: list[dict]) -> str:
-    """jawaban: [{'instrument': 'X', 'item_n': 1, 'score': 4}, ...]. Mengembalikan respondent_id."""
-    try:
-        resp = _cari_respondent(training_id, email)
-        if resp:
-            rid = resp["id"]
-            # Jawaban lama untuk instrumen yang sama diganti dengan yang baru
-            for ins in {j["instrument"] for j in jawaban}:
-                get_supabase().table(RESPONSE_TABLE).delete().eq("respondent_id", rid).eq("instrument", ins).execute()
-        else:
-            res = get_supabase().table(RESPONDENT_TABLE).insert(
-                {"training_id": training_id, "full_name": nama, "email": email}).execute()
-            rid = res.data[0]["id"]
-        rows = [{"respondent_id": rid, **j} for j in jawaban]
-        if rows:
-            get_supabase().table(RESPONSE_TABLE).insert(rows).execute()
-    except Exception as e:  # noqa: BLE001
-        raise DatabaseError(str(e)) from e
-    hitung_statistik.clear()
-    return rid
-
-
-def ambil_jawaban_asesmen(training_id, email) -> list[dict]:
-    try:
-        resp = _cari_respondent(training_id, email)
-        if not resp:
-            return []
-        res = (get_supabase().table(RESPONSE_TABLE).select("instrument, item_n, score")
-               .eq("respondent_id", resp["id"]).execute())
-    except Exception as e:  # noqa: BLE001
-        raise DatabaseError(str(e)) from e
-    return res.data or []
+def judul_paket(kode: str) -> str:
+    return EXAM_PACKAGES.get(kode, {}).get("title", kode or "")
 
 
 def cari_sertifikat(sertifikasi: str, kata_kunci: str) -> list[dict]:
-    """Cari data lulusan berdasarkan nomor sertifikat (CERC-2026-000089) atau nama lengkap."""
+    """Cari kelulusan berdasarkan nomor sertifikat (CERC-2026-000089) atau nama lengkap."""
     kata_kunci = (kata_kunci or "").strip()
-    sb = get_supabase()
     try:
         m = re.fullmatch(r"([A-Za-z]+)-(\d{4})-(\d+)", kata_kunci)
-        q = sb.table(EXAM_TABLE).select("id, training_id, full_name, score, passed, created_at").eq("passed", True)
+        q = sb().table("exam_attempts").select("*").eq("passed", True)
         if m:
             q = q.eq("id", int(m.group(3)))
         else:
             if len(kata_kunci) < 3:
                 return []
             q = q.ilike("full_name", f"%{kata_kunci}%")
-        attempts = q.order("created_at").limit(50).execute().data or []
+        attempts = q.order("created_at").limit(100).execute().data or []
         if not attempts:
             return []
         ids = list({a["training_id"] for a in attempts})
-        tr = sb.table(TRAINING_TABLE).select("id, name").in_("id", ids).execute().data or []
+        tr = sb().table("trainings").select("id, name").in_("id", ids).execute().data or []
     except Exception as e:  # noqa: BLE001
         raise DatabaseError(str(e)) from e
     nama_tr = {t["id"]: t["name"] for t in tr}
     hasil, sudah = [], set()
     for a in attempts:
-        nama_training = nama_tr.get(a["training_id"], "")
-        kode = _tebak_sertifikasi(nama_training)
+        kode = a.get("package") or tebak_sertifikasi(nama_tr.get(a["training_id"], ""))
+        if m and kode and kode.upper() != m.group(1).upper():
+            continue
         if sertifikasi and kode and kode != sertifikasi:
             continue
-        kunci = (a["training_id"], (a["full_name"] or "").lower())
-        if kunci in sudah:  # satu sertifikat per orang per training (kelulusan pertama)
+        kunci = (a["training_id"], (a.get("email") or a["full_name"] or "").lower(), kode)
+        if kunci in sudah:  # satu sertifikat per orang per training per paket (kelulusan pertama)
             continue
         sudah.add(kunci)
         hasil.append({
-            "nama": a["full_name"], "training": nama_training, "sertifikasi": kode or sertifikasi,
-            "nomor": nomor_sertifikat(kode or sertifikasi, a), "tanggal": format_tanggal(a["created_at"]),
-            "nilai": a["score"],
+            "nama": a["full_name"], "training": nama_tr.get(a["training_id"], ""),
+            "paket": judul_paket(kode), "nomor": nomor_sertifikat(a), "tanggal": format_tanggal(a["created_at"]),
         })
     return hasil
